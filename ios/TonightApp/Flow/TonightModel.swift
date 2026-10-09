@@ -3,6 +3,7 @@ import Foundation
 import MarkingKit
 import Observation
 import ProfilesKit
+import SpeechKit
 import TaskKit
 
 enum TonightRoute: Equatable {
@@ -391,9 +392,14 @@ final class TonightModel {
     var authMethod = "email"
     let consentStore = InMemoryAdultConsentStore()
     let sessionStore: any ParentSessionStoring
+    let speech: any SpeechSynthesizing
 
-    init(sessionStore: any ParentSessionStoring = KeychainSessionStore()) {
+    init(
+        sessionStore: any ParentSessionStoring = KeychainSessionStore(),
+        speech: any SpeechSynthesizing = IndianEnglishSpeech()
+    ) {
         self.sessionStore = sessionStore
+        self.speech = speech
         let arguments = ProcessInfo.processInfo.arguments
         gate = GateModel(fixed: arguments.contains("-TonightFixedGate"))
         if let index = arguments.firstIndex(of: "-TonightScreen"), arguments.indices.contains(arguments.index(after: index)) {
@@ -654,7 +660,7 @@ final class TonightModel {
         let denied = ProcessInfo.processInfo.arguments.contains("-TonightMicDenied")
         let unavailable = ProcessInfo.processInfo.arguments.contains("-TonightSpeechUnavailable")
         if task.checkMode == .auto {
-            readAloud = ReadAloudSession(task: task, micDenied: denied, speechUnavailable: unavailable)
+            readAloud = ReadAloudSession(task: task, micDenied: denied, speechUnavailable: unavailable, speech: speech)
             route = .readAloud
         } else {
             let cameraDenied = ProcessInfo.processInfo.arguments.contains("-TonightCameraDenied")
@@ -704,6 +710,12 @@ final class TonightModel {
             today.praises.append(praise)
         }
         praiseDraft.sent = true
+    }
+
+    func hearPraise(_ praise: Praise) {
+        let text = praise.text ?? praise.presetPhrase ?? ""
+        let speaker = speech
+        Task { await SpokenCue.passage(text, using: speaker) }
     }
 
     func thankPraise(_ praise: Praise) {

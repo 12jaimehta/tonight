@@ -115,10 +115,19 @@ final class ReadAloudSession {
     var unavailableReason: String?
     var hearingWord: String?
     let micDenied: Bool
+    let passage: String
+    let speech: any SpeechSynthesizing
     let engine: FakeSpeechEngine
 
-    init(task: HomeworkTask, micDenied: Bool = false, speechUnavailable: Bool = false) {
+    init(
+        task: HomeworkTask,
+        micDenied: Bool = false,
+        speechUnavailable: Bool = false,
+        speech: any SpeechSynthesizing = IndianEnglishSpeech()
+    ) {
         taskID = task.id
+        passage = task.confirmedText ?? ""
+        self.speech = speech
         self.micDenied = micDenied
         if speechUnavailable {
             phase = .unavailable
@@ -140,7 +149,16 @@ final class ReadAloudSession {
 
     func hear() {
         guard phase != .recording else { return }
-        phase = phase == .hearing ? .idle : .hearing
+        if phase == .hearing {
+            speech.stop()
+            phase = .idle
+            return
+        }
+        let text = passage
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        phase = .hearing
+        let speaker = speech
+        Task { await SpokenCue.passage(text, using: speaker) }
     }
 
     func read() {

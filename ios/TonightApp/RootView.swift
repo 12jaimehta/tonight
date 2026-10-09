@@ -98,7 +98,7 @@ struct RootView: View {
                 }
             case .childResult:
                 if let child = model.child, let session = model.readAloud, let task = model.task(session.taskID), let mark = (session.mark ?? model.today.marks[task.id]) {
-                    ChildResultScreen(child: child, task: task, mark: mark, onHome: { model.route = .childHome })
+                    ChildResultScreen(child: child, task: task, mark: mark, speech: model.speech, onHome: { model.route = .childHome })
                 }
             case .notebook:
                 if let child = model.child, let session = model.notebook, let task = model.task(session.taskID) {
@@ -106,6 +106,7 @@ struct RootView: View {
                         child: child,
                         task: task,
                         session: session,
+                        speech: model.speech,
                         onBack: { model.route = .childHome },
                         onSend: model.sendNotebook,
                         onGrownUp: { model.openGate(for: .exitChild) }
@@ -153,7 +154,7 @@ struct RootView: View {
                         praise: praise,
                         stars: model.praiseStars(for: task),
                         markVisible: model.markVisible(for: task),
-                        onHear: {},
+                        onHear: { model.hearPraise(praise) },
                         onThanks: { model.thankPraise(praise) }
                     )
                 }

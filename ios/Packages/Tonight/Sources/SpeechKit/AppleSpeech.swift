@@ -260,3 +260,18 @@ public final class IndianEnglishSpeech: NSObject, SpeechSynthesizing, AVSpeechSy
         synthesizer.stopSpeaking(at: .immediate)
     }
 }
+
+/// Hear it and Hear word. Callers pass `IndianEnglishSpeech` or a test double.
+public enum SpokenCue {
+    public static func passage(_ text: String, using speech: any SpeechSynthesizing) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await speech.speak(trimmed, rate: IndianEnglishSpeech.passageRate)
+    }
+
+    public static func word(_ text: String, using speech: any SpeechSynthesizing) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await speech.speak(trimmed, rate: IndianEnglishSpeech.wordRate)
+    }
+}

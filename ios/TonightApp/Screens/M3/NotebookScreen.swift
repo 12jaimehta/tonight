@@ -1,5 +1,6 @@
 import DesignSystem
 import ProfilesKit
+import SpeechKit
 import SwiftUI
 import TaskKit
 
@@ -8,6 +9,7 @@ struct NotebookScreen: View {
     var child: ChildProfile
     var task: HomeworkTask
     @Bindable var session: NotebookSession
+    var speech: any SpeechSynthesizing = IndianEnglishSpeech()
     var onBack: @MainActor () -> Void
     var onSend: @MainActor () -> Void
     var onGrownUp: @MainActor () -> Void
@@ -69,10 +71,17 @@ struct NotebookScreen: View {
                     Image(systemName: "doc.text")
                     Text("Page photo")
                     Spacer()
-                    Image(systemName: "speaker.wave.2.fill")
-                        .frame(width: CGFloat(TonightSize.tapChild), height: CGFloat(TonightSize.tapChild))
-                        .background(Circle().fill(TonightColor.sky))
-                        .accessibilityLabel("Hear it")
+                    Button(action: {
+                        let speaker = speech
+                        let text = task.instruction
+                        Task { await SpokenCue.passage(text, using: speaker) }
+                    }) {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .frame(width: CGFloat(TonightSize.tapChild), height: CGFloat(TonightSize.tapChild))
+                            .background(Circle().fill(TonightColor.sky))
+                    }
+                    .accessibilityLabel("Hear it")
+                    .accessibilityIdentifier("notebook.hear")
                 }
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 18).fill(TonightColor.white))

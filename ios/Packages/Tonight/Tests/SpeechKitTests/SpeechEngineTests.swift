@@ -188,6 +188,32 @@ final class SpeechEngineTests: XCTestCase {
     }
 }
 
+final class RecordingSynthesizer: SpeechSynthesizing, @unchecked Sendable {
+    var spoken: [(text: String, rate: Float)] = []
+
+    func speak(_ text: String, rate: Float) async {
+        spoken.append((text, rate))
+    }
+
+    func stop() {}
+}
+
+final class SpokenCueTests: XCTestCase {
+    func testHearItAsksForThePassage() async {
+        let fake = RecordingSynthesizer()
+        await SpokenCue.passage("Ravi has a red kite.", using: fake)
+        XCTAssertEqual(fake.spoken.map(\.text), ["Ravi has a red kite."])
+        XCTAssertEqual(fake.spoken.map(\.rate), [IndianEnglishSpeech.passageRate])
+    }
+
+    func testHearWordAsksForTheWord() async {
+        let fake = RecordingSynthesizer()
+        await SpokenCue.word("strong", using: fake)
+        XCTAssertEqual(fake.spoken.map(\.text), ["strong"])
+        XCTAssertEqual(fake.spoken.map(\.rate), [IndianEnglishSpeech.wordRate])
+    }
+}
+
 private func sourceText(at root: URL) throws -> String {
     let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? []
     return try files.filter { $0.pathExtension == "swift" }.map { try String(contentsOf: $0) }.joined(separator: "\n")

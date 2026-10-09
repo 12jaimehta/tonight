@@ -1,6 +1,7 @@
 import DesignSystem
 import MarkingKit
 import ProfilesKit
+import SpeechKit
 import SwiftUI
 
 /// M3-03. A hidden mark renders no stars, numbers, or word list.
@@ -8,6 +9,7 @@ struct ChildResultScreen: View {
     var child: ChildProfile
     var task: HomeworkTask
     var mark: Mark
+    var speech: any SpeechSynthesizing = IndianEnglishSpeech()
     var onHome: @MainActor () -> Void
     @State private var hearing: String?
 
@@ -98,7 +100,11 @@ struct ChildResultScreen: View {
                     Text(word)
                         .font(TonightFont.child(26))
                     Spacer()
-                    Button(action: { hearing = word }) {
+                    Button(action: {
+                        hearing = word
+                        let speaker = speech
+                        Task { await SpokenCue.word(word, using: speaker) }
+                    }) {
                         Image(systemName: hearing == word ? "speaker.wave.2.fill" : "speaker.wave.2")
                             .frame(width: CGFloat(TonightSize.tapChild), height: CGFloat(TonightSize.tapChild))
                     }
