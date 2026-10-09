@@ -283,7 +283,10 @@ public enum TonightSchemaV1: VersionedSchema {
         }
 
         public func check() -> ParentCheck {
-            ParentCheck(id: id, attemptID: attemptID, stars: stars, checkedAt: checkedAt)
+            guard let check = ParentCheck(id: id, attemptID: attemptID, stars: stars, checkedAt: checkedAt) else {
+                preconditionFailure("Stored parent check stars must be 1, 2, or 3")
+            }
+            return check
         }
     }
 
@@ -380,7 +383,7 @@ public enum TonightStore {
         let schema = Schema(versionedSchema: TonightSchemaV1.self)
         let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
         let container = try ModelContainer(
-            for: TonightSchemaV1.self,
+            for: schema,
             migrationPlan: TonightMigrationPlan.self,
             configurations: configuration
         )
