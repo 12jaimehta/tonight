@@ -12,7 +12,7 @@ The app target is iOS 17 or newer, iPhone, portrait only. Bundle id `com.tonight
 
 | Module | Responsibility |
 | --- | --- |
-| DesignSystem | OKLCH colour tokens (bg, fg, accent, soft) from a subject hue, and static views. `TonightMotion.animationsInV1` is false. Lightness and chroma are placeholders. |
+| DesignSystem | OKLCH tokens (bg, edge, fg, accent, soft) from a subject hue, plus static views. `TonightMotion.animationsInV1` is false. Lightness and chroma come from the generated recipe in `tokens.json`. |
 | AuthKit | Parent session in the Keychain (never a PIN) and an adult-consent record. Tests use an in-memory session store. |
 | ProfilesKit | Child profiles, per-child subject rows, subject catalogue, audience config, parental gate |
 | TaskKit | One homework item, check mode, stars, notebook photo, praise, activity seams |
