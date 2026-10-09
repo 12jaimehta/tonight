@@ -110,7 +110,7 @@ struct ParentResultScreen: View {
                             .foregroundStyle(TonightColor.pInkSoft)
                         Text("Send praise")
                             .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .bold))
-                        PraiseChips(draft: praise)
+                        PraiseChips(draft: praise, presets: PraisePresets.reading)
                         Button(action: onSend) {
                             Text(praise.sent ? "Sent ✓" : "Send to \(child.nickname)")
                         }
@@ -241,7 +241,7 @@ struct ParentCheckScreen: View {
                         .accessibilityLabel("How did it go?")
                         Text("Say something nice")
                             .font(TonightFont.parent(CGFloat(TonightType.Text.pSm), weight: .bold))
-                        PraiseChips(draft: praise)
+                        PraiseChips(draft: praise, presets: PraisePresets.notebook)
                         Text(previewLine)
                             .font(TonightFont.parent(CGFloat(TonightType.Text.pSm)))
                             .foregroundStyle(TonightColor.pInkSoft)
@@ -293,11 +293,12 @@ struct ParentCheckScreen: View {
 
 struct PraiseChips: View {
     @Bindable var draft: PraiseDraft
+    var presets: [PraisePreset]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                ForEach(PraisePresets.v1) { preset in
+                ForEach(presets) { preset in
                     Button(preset.phrase) { draft.presetID = preset.id; draft.writing = false }
                         .font(TonightFont.parent(14, weight: .bold))
                         .padding(.horizontal, 12)

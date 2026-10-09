@@ -119,6 +119,10 @@ final class HomeworkTaskTests: XCTestCase {
         let bare = Praise(taskID: UUID(), presetID: "proud", lang: "en")
         XCTAssertNil(bare.text)
         XCTAssertEqual(bare.presetPhrase, "So proud of you")
+        XCTAssertEqual(PraisePresets.reading.map(\.phrase), ["Super reading!", "शाबाश!", "So proud of you"])
+        XCTAssertEqual(PraisePresets.notebook.map(\.phrase), ["Super sums!", "शाबाश!", "Great effort"])
+        XCTAssertEqual(PraisePresets.phrase(id: "super-sums"), "Super sums!")
+        XCTAssertEqual(PraisePresets.phrase(id: "great-effort"), "Great effort")
         let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(praise)) as? [String: Any]
         XCTAssertEqual(object?["presetID"] as? String, "shabash")
         XCTAssertEqual(object?["text"] as? String, "You kept going")

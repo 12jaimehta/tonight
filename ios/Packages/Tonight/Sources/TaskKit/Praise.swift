@@ -13,11 +13,23 @@ public struct PraisePreset: Codable, Hashable, Sendable, Identifiable {
 }
 
 public enum PraisePresets {
-    public static let v1: [PraisePreset] = [
+    /// M3-06 parent result chips.
+    public static let reading: [PraisePreset] = [
         PraisePreset(id: "super-reading", phrase: "Super reading!", lang: "en"),
         PraisePreset(id: "shabash", phrase: "शाबाश!", lang: "hi"),
         PraisePreset(id: "proud", phrase: "So proud of you", lang: "en"),
     ]
+
+    /// M3-07 notebook check chips, from the parent-check screenshot.
+    public static let notebook: [PraisePreset] = [
+        PraisePreset(id: "super-sums", phrase: "Super sums!", lang: "en"),
+        PraisePreset(id: "shabash", phrase: "शाबाश!", lang: "hi"),
+        PraisePreset(id: "great-effort", phrase: "Great effort", lang: "en"),
+    ]
+
+    public static let v1: [PraisePreset] = reading + notebook.filter { preset in
+        reading.contains { $0.id == preset.id } == false
+    }
 
     public static func phrase(id: String) -> String? {
         v1.first { $0.id == id }?.phrase
