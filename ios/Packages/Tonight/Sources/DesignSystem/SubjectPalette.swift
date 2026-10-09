@@ -1,15 +1,16 @@
 import Foundation
 
-/// Four tokens for one subject. The hue comes from the subject row.
-/// Lightness and chroma are stand-ins until Tonight Design publishes the numbers.
+/// Subject colours from the tokens.json recipe. The hue comes from subjects.py.
 public struct SubjectPalette: Hashable, Sendable {
     public var bg: OKLCH
+    public var edge: OKLCH
     public var fg: OKLCH
     public var accent: OKLCH
     public var soft: OKLCH
 
-    public init(bg: OKLCH, fg: OKLCH, accent: OKLCH, soft: OKLCH) {
+    public init(bg: OKLCH, edge: OKLCH, fg: OKLCH, accent: OKLCH, soft: OKLCH) {
         self.bg = bg
+        self.edge = edge
         self.fg = fg
         self.accent = accent
         self.soft = soft
@@ -19,6 +20,7 @@ public struct SubjectPalette: Hashable, Sendable {
         let hue = normalizedHue(hue)
         return SubjectPalette(
             bg: OKLCH(lightness: PalettePlaceholders.backgroundLightness, chroma: PalettePlaceholders.backgroundChroma, hue: hue),
+            edge: OKLCH(lightness: PalettePlaceholders.edgeLightness, chroma: PalettePlaceholders.edgeChroma, hue: hue),
             fg: OKLCH(lightness: PalettePlaceholders.foregroundLightness, chroma: PalettePlaceholders.foregroundChroma, hue: hue),
             accent: OKLCH(lightness: PalettePlaceholders.accentLightness, chroma: PalettePlaceholders.accentChroma, hue: hue),
             soft: OKLCH(lightness: PalettePlaceholders.softLightness, chroma: PalettePlaceholders.softChroma, hue: hue)
@@ -32,14 +34,16 @@ public struct SubjectPalette: Hashable, Sendable {
     }
 }
 
-/// Placeholder lightness and chroma. Replace these when design ships the real tokens.
+/// Recipe lightness and chroma. The numbers are TonightRecipe, generated from tokens.json.
 public enum PalettePlaceholders {
-    public static let backgroundLightness = 0.96
-    public static let backgroundChroma = 0.03
-    public static let foregroundLightness = 0.30
-    public static let foregroundChroma = 0.07
-    public static let accentLightness = 0.62
-    public static let accentChroma = 0.14
-    public static let softLightness = 0.91
-    public static let softChroma = 0.045
+    public static let backgroundLightness = TonightRecipe.bgLightness
+    public static let backgroundChroma = TonightRecipe.bgChroma
+    public static let edgeLightness = TonightRecipe.edgeLightness
+    public static let edgeChroma = TonightRecipe.edgeChroma
+    public static let foregroundLightness = TonightRecipe.fgLightness
+    public static let foregroundChroma = TonightRecipe.fgChroma
+    public static let accentLightness = TonightRecipe.accentLightness
+    public static let accentChroma = TonightRecipe.accentChroma
+    public static let softLightness = TonightRecipe.softLightness
+    public static let softChroma = TonightRecipe.softChroma
 }
