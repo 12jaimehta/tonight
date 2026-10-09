@@ -1,4 +1,5 @@
 import Foundation
+import MarkingKit
 
 public enum CheckMode: String, Codable, Hashable, Sendable {
     case auto
