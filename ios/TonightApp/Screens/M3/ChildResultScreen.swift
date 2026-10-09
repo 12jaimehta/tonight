@@ -3,6 +3,7 @@ import MarkingKit
 import ProfilesKit
 import SpeechKit
 import SwiftUI
+import TaskKit
 
 /// M3-03. A hidden mark renders no stars, numbers, or word list.
 struct ChildResultScreen: View {
