@@ -11,6 +11,7 @@
 		A10000000000000000000052 /* ProfilesKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000042 /* ProfilesKit */; };
 		A10000000000000000000053 /* SpeechKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000043 /* SpeechKit */; };
 		A10000000000000000000054 /* PaywallKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000044 /* PaywallKit */; };
+		A10000000000000000000055 /* AuthKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000045 /* AuthKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 				A10000000000000000000052 /* ProfilesKit in Frameworks */,
 				A10000000000000000000053 /* SpeechKit in Frameworks */,
 				A10000000000000000000054 /* PaywallKit in Frameworks */,
+				A10000000000000000000055 /* AuthKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +120,7 @@
 				A10000000000000000000042 /* ProfilesKit */,
 				A10000000000000000000043 /* SpeechKit */,
 				A10000000000000000000044 /* PaywallKit */,
+				A10000000000000000000045 /* AuthKit */,
 			);
 			productName = Tonight;
 			productReference = A10000000000000000000012 /* Tonight.app */;
@@ -438,6 +441,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
 			productName = PaywallKit;
+		};
+		A10000000000000000000045 /* AuthKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = AuthKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
