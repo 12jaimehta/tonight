@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// A parent session. The Keychain stores this record and nothing a child could guess.
 public struct ParentSession: Codable, Equatable, Sendable, Identifiable {
@@ -38,27 +39,20 @@ public protocol ParentSessionStoring: Sendable {
 
 /// Used by tests and by previews. The app uses `KeychainSessionStore`.
 public final class InMemorySessionStore: ParentSessionStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var session: ParentSession?
+    private let session = OSAllocatedUnfairLock<ParentSession?>(initialState: nil)
 
     public init() {}
 
     public func save(_ session: ParentSession) throws {
-        lock.lock()
-        self.session = session
-        lock.unlock()
+        self.session.withLock { $0 = session }
     }
 
     public func load() throws -> ParentSession? {
-        lock.lock()
-        defer { lock.unlock() }
-        return session
+        session.withLock { $0 }
     }
 
     public func clear() throws {
-        lock.lock()
-        session = nil
-        lock.unlock()
+        session.withLock { $0 = nil }
     }
 }
 

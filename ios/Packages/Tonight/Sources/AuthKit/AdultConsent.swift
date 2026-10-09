@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The parent confirmed they are the adult. This is not the per-child audio consent in SpeechKit.
 /// The consent screen itself is a stub until design (T-008).
@@ -27,26 +28,19 @@ public struct AdultConsentRecord: Codable, Equatable, Sendable, Identifiable {
 }
 
 public final class InMemoryAdultConsentStore: @unchecked Sendable {
-    private let lock = NSLock()
-    private var record: AdultConsentRecord?
+    private let record = OSAllocatedUnfairLock<AdultConsentRecord?>(initialState: nil)
 
     public init() {}
 
     public func save(_ record: AdultConsentRecord) {
-        lock.lock()
-        self.record = record
-        lock.unlock()
+        self.record.withLock { $0 = record }
     }
 
     public func current() -> AdultConsentRecord? {
-        lock.lock()
-        defer { lock.unlock() }
-        return record
+        record.withLock { $0 }
     }
 
     public func clear() {
-        lock.lock()
-        record = nil
-        lock.unlock()
+        record.withLock { $0 = nil }
     }
 }

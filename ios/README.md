@@ -28,11 +28,18 @@ The app target is iOS 17 or newer, iPhone, portrait only. Bundle id `com.tonight
 
 `xcodebuild` and `swift` are not installed in the environment that prepared this branch, so these tests have not been executed here.
 
-Package tests, from a Mac with Xcode 26:
+Package tests, from a Mac with Xcode 26. The package scheme is `Tonight-Package`:
 
 ```sh
 cd ios/Packages/Tonight
-xcodebuild test -scheme Tonight -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -scheme Tonight-Package -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO
+```
+
+To compile the package tests without a named simulator:
+
+```sh
+cd ios/Packages/Tonight
+xcodebuild build-for-testing -scheme Tonight-Package -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
 ```
 
 App and UI tests:

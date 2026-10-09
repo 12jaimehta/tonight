@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public struct ProxyRequest: Sendable, Equatable {
     public var url: URL
@@ -99,18 +100,13 @@ public struct SpeechAuditEntry: Codable, Sendable, Equatable {
 }
 
 public final class SpeechAuditLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var entries: [SpeechAuditEntry] = []
+    private let entries = OSAllocatedUnfairLock(initialState: [SpeechAuditEntry]())
     public init() {}
     public func append(_ entry: SpeechAuditEntry) {
-        lock.lock()
-        entries.append(entry)
-        lock.unlock()
+        entries.withLock { $0.append(entry) }
     }
     public func snapshot() -> [SpeechAuditEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        return entries
+        entries.withLock { $0 }
     }
 }
 
@@ -137,29 +133,26 @@ public struct AudioArtefact: Identifiable, Sendable, Equatable {
 }
 
 public final class AudioArtefactRegistry: @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [AudioArtefact] = []
+    private let items = OSAllocatedUnfairLock(initialState: [AudioArtefact]())
     public init() {}
 
     public func register(_ item: AudioArtefact) {
-        lock.lock()
-        items.append(item)
-        lock.unlock()
+        items.withLock { $0.append(item) }
     }
 
     public func delete(childProfileID: UUID, serverPathOnly: Bool, at date: Date) {
-        lock.lock()
-        for index in items.indices where items[index].childProfileID == childProfileID {
-            if serverPathOnly && !items[index].serverPath { continue }
-            items[index].deletedAt = date
+        items.withLock { items in
+            for index in items.indices where items[index].childProfileID == childProfileID {
+                if serverPathOnly && !items[index].serverPath { continue }
+                items[index].deletedAt = date
+            }
         }
-        lock.unlock()
     }
 
     public func live(childProfileID: UUID) -> [AudioArtefact] {
-        lock.lock()
-        defer { lock.unlock() }
-        return items.filter { $0.childProfileID == childProfileID && $0.deletedAt == nil }
+        items.withLock { items in
+            items.filter { $0.childProfileID == childProfileID && $0.deletedAt == nil }
+        }
     }
 }
 
@@ -405,18 +398,13 @@ public struct SpeechAttemptRunner: Sendable {
 }
 
 public final class CallLogStore: @unchecked Sendable {
-    private let lock = NSLock()
-    private var logs: [SpeechCallLog] = []
+    private let logs = OSAllocatedUnfairLock(initialState: [SpeechCallLog]())
     public init() {}
     public func append(_ log: SpeechCallLog) {
-        lock.lock()
-        logs.append(log)
-        lock.unlock()
+        logs.withLock { $0.append(log) }
     }
     public func snapshot() -> [SpeechCallLog] {
-        lock.lock()
-        defer { lock.unlock() }
-        return logs
+        logs.withLock { $0 }
     }
 }
 
@@ -440,7 +428,7 @@ public enum ProxySessionFactory {
 
 public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Sendable {
     private let session: URLSession
-    private let lock = NSLock()
+    private let lock = OSAllocatedUnfairLock()
     private var task: URLSessionTask?
 
     public init(session: URLSession = ProxySessionFactory.foreground()) {
@@ -458,9 +446,8 @@ public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Senda
     }
 
     public func cancelAll() async {
-        lock.lock()
-        task?.cancel()
-        lock.unlock()
+        // URLSessionTask is not Sendable, so the scoped critical section uses the unchecked variant.
+        lock.withLockUnchecked { self.task?.cancel() }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             session.getAllTasks { tasks in
                 tasks.forEach { $0.cancel() }
