@@ -1,0 +1,100 @@
+id,category,question_type,settings,expected_answer,child_input,expected_result,expected_points,notes
+TC-001,whitespace,integer,,42,  42  ,correct,1,leading/trailing spaces
+TC-002,whitespace,integer,,42,"42
+",correct,1,trailing newline
+TC-003,whitespace,integer,,42,	42,correct,1,tab
+TC-004,whitespace,integer,,42, 42 ,correct,1,non-breaking spaces
+TC-005,whitespace,integer,,42,4​2,correct,1,zero-width space inside number removed
+TC-006,whitespace,integer,,7,,not_answered,0,empty string; UI must not say wrong
+TC-007,whitespace,integer,,7,   ,not_answered,0,whitespace only
+TC-008,indian_format,integer,,100000,"1,00,000",correct,1,Indian lakh grouping
+TC-009,indian_format,integer,,10000000,"1,00,00,000",correct,1,Indian crore grouping
+TC-010,indian_format,integer,,100000,"100,000",correct,1,Western grouping
+TC-011,indian_format,integer,,100000,100000,correct,1,no grouping
+TC-012,indian_format,integer,,25000,"25,000",correct,1,thousands same in both systems
+TC-013,indian_format,integer,,100,"1,0,0",needs_review,0,"malformed grouping - flag, never silently accept"
+TC-014,indian_format,integer,,1000,"1,,000",needs_review,0,double comma
+TC-015,indian_format,integer,,100000,1 lakh,correct,1,lakh word (if supported; else needs_review)
+TC-016,indian_format,integer,,100000,"1,00,001",incorrect,0,off by one
+TC-017,unicode_digits,integer,,42,४२,correct,1,Devanagari digits
+TC-018,unicode_digits,integer,,42,４２,correct,1,full-width digits (NFKC)
+TC-019,unicode_digits,integer,allow_negative,-5,−5,correct,1,U+2212 minus sign
+TC-020,integer,integer,,7,007,correct,1,leading zeros
+TC-021,integer,integer,,7,+7,correct,1,explicit plus
+TC-022,integer,integer,,7,7.,correct,1,trailing full stop
+TC-023,integer,integer,,7,seven,correct,1,"number word (if supported; else needs_review, never crash)"
+TC-024,integer,integer,,25,twenty-five,correct,1,hyphenated number word
+TC-025,integer,integer,,7,3+4,needs_review,0,expressions are not evaluated
+TC-026,integer,integer,,1000,1e3,needs_review,0,scientific notation rejected
+TC-027,integer,integer,,7,-7,incorrect,0,sign matters
+TC-028,integer,integer,,7,8,incorrect,0,plain wrong
+TC-029,integer,integer,,7,7 apples,correct,1,trailing noun when unit=none? spec: strip known nouns or needs_review - decide
+TC-030,integer,integer,,7,😀,needs_review,0,emoji; must not crash
+TC-031,integer,integer,,7,99999999999999999999999,incorrect,0,overflow beyond Int64 must not crash
+TC-032,decimal,decimal,,3.5,3.50,correct,1,trailing zero
+TC-033,decimal,decimal,,3.5,03.5,correct,1,leading zero
+TC-034,decimal,decimal,,0.5,.5,correct,1,no leading zero
+TC-035,decimal,decimal,,5,5.,correct,1,trailing point
+TC-036,decimal,decimal,,0.3,0.30,correct,1,float trap: must use Decimal/rational
+TC-037,decimal,decimal,,0.3,0.30000000000000004,incorrect,0,"exact comparison, no float epsilon"
+TC-038,decimal,decimal,,3.5,"3,5",needs_review,0,decimal comma ambiguous; same on every device locale
+TC-039,decimal,decimal,,3.5,35,incorrect,0,missing point
+TC-040,decimal,decimal,dp=1,3.46 rounded,3.5,correct,1,round to 1 dp question; key stores 3.5
+TC-041,fraction,fraction,simplest=false,1/2,1/2,correct,1,exact
+TC-042,fraction,fraction,simplest=false,1/2,1 / 2,correct,1,spaces around slash
+TC-043,fraction,fraction,simplest=false,1/2,½,correct,1,vulgar fraction char
+TC-044,fraction,fraction,simplest=false,1/2,2/4,correct,1,equivalent allowed
+TC-045,fraction,fraction,simplest=true,1/2,2/4,partial,0.5,"right value, not simplest form"
+TC-046,fraction,fraction,simplest=false,3/2,1 1/2,correct,1,mixed number
+TC-047,fraction,fraction,simplest=false,1/2,0.5,correct,1,decimal equivalent accepted when accept_equivalent_form=true (default to confirm)
+TC-048,fraction,fraction,form=fraction_only,1/2,0.5,partial,0.5,"value right, wrong form"
+TC-049,fraction,fraction,,1/2,1/0,needs_review,0,zero denominator; no crash
+TC-050,fraction,fraction,,1/2,1//2,needs_review,0,malformed
+TC-051,fraction,fraction,,1/2,2/1,incorrect,0,inverted
+TC-052,fraction,fraction,allow_negative,-1/2,1/-2,correct,1,negative placement
+TC-053,units,measure,unit=optional,5 cm,5,correct,1,unit optional
+TC-054,units,measure,unit=optional,5 cm,5cm,correct,1,no space
+TC-055,units,measure,unit=optional,5 cm,5 CM,correct,1,case
+TC-056,units,measure,unit=optional,5 cm,5 cms,correct,1,Indian plural spelling
+TC-057,units,measure,unit=required,5 cm,5,partial,0.5,missing required unit
+TC-058,units,measure,unit=required,5 cm,5 m,incorrect,0,wrong unit
+TC-059,units,measure,unit=required,2 kg,2 kgs,correct,1,synonym
+TC-060,units,measure,unit=required,3 l,3 litres,correct,1,NCERT spelling litre
+TC-061,units,measure,unit=required,3 l,3 liters,correct,1,US spelling
+TC-062,units,measure,unit=required;convert=false,500 g,0.5 kg,incorrect,0,no conversion unless allowed
+TC-063,units,measure,unit=required;convert=true,500 g,0.5 kg,correct,1,conversion allowed
+TC-064,money,money,,12.50,₹12.50,correct,1,rupee symbol
+TC-065,money,money,,12.50,Rs. 12.5,correct,1,Rs. prefix and 1 dp
+TC-066,money,money,,12.50,Rs 12.50,correct,1,Rs without dot
+TC-067,money,money,,50,50/-,correct,1,Indian /- suffix
+TC-068,money,money,dp=2_strict,12.50,12.5,partial,0.5,strict 2dp question
+TC-069,money,money,,12.50,12 rupees 50 paise,correct,1,words (if supported; else needs_review)
+TC-070,time,time,,3:30,3:30,correct,1,colon
+TC-071,time,time,,3:30,3.30,correct,1,Indian school dot notation; must not be decimal 3.3
+TC-072,time,time,clock=12h,3:30,3:30 pm,correct,1,am/pm suffix
+TC-073,time,time,clock=any,3:30 pm,15:30,correct,1,24h equivalent
+TC-074,time,time,,3:30,half past three,correct,1,words (if supported)
+TC-075,time,time,,3:30,3:03,incorrect,0,wrong minutes
+TC-076,percent,percent,,50%,50 %,correct,1,space
+TC-077,percent,percent,,50%,50 percent,correct,1,word
+TC-078,rounding,integer,,50 (round 45 to nearest 10),50,correct,1,round half up per NCERT
+TC-079,rounding,integer,,50 (round 45 to nearest 10),40,incorrect,0,round down is wrong
+TC-080,rounding,integer,tolerance=5,100 (estimate),96,correct,1,inside tolerance
+TC-081,rounding,integer,tolerance=5,100 (estimate),105,correct,1,tolerance inclusive at boundary
+TC-082,rounding,integer,tolerance=5,100 (estimate),106,incorrect,0,outside tolerance
+TC-083,partial_credit,multi_blank,blanks=3,"[4,5,6]","[4,5,7]",partial,0.6667,2 of 3 blanks; store exact 2/3
+TC-084,partial_credit,multi_blank,blanks=3,"[4,5,6]","[4,,6]",partial,0.6667,one blank unanswered
+TC-085,partial_credit,multi_blank,blanks=3,"[4,5,6]","[6,5,4]",partial,0.3333,order matters unless unordered=true
+TC-086,partial_credit,multi_blank,blanks=3;unordered=true,"[4,5,6]","[6,5,4]",correct,1,unordered set
+TC-087,total_display,homework_total,,2 of 3 questions,—,display 67%,0.6667,round half up at display only
+TC-088,total_display,homework_total,,1 of 8 questions,—,display 13%,0.125,"12.5 -> 13 (half up, not banker's 12)"
+TC-089,total_display,homework_total,,199 of 200 points,—,display 99%,0.995,never show 100% unless all correct
+TC-090,total_display,homework_total,,0 questions,—,display —,0,empty homework: no divide-by-zero
+TC-091,reading,reading,lang=en-IN,The cat sat,the cat sat,correct,1,case-insensitive
+TC-092,reading,reading,lang=en-IN,The cat sat,the sat,partial,0.6667,one missed word
+TC-093,reading,reading,lang=en-IN,Don't run,dont run,correct,1,apostrophe must not split (prototype bug)
+TC-094,reading,reading,lang=hi-IN,किताब पढ़ो,किताब पढ़ो,correct,1,Devanagari matras kept (prototype stripped them)
+TC-095,reading,reading,lang=hi-IN,किताब पढ़ो,किताब,partial,0.5,one of two Hindi words
+TC-096,reading,reading,lang=en-IN,I have 7 pens,i have seven pens,correct,1,digit vs spoken number word must match
+TC-097,reading,reading,lang=en-IN,It costs 3.5 rupees,it costs 3.5 rupees,correct,1,decimal kept as one token (prototype split it)
+TC-098,determinism,integer,"run under locales en_IN,de_DE,ar_SA",1000,"1,000",correct,1,same result for every device locale/region
