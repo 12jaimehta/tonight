@@ -106,7 +106,7 @@ public enum AnswerScorer {
         if questionType == "percent" {
             return compareNumbers(expected: stripPercent(expectedBody), child: stripPercent(child), tolerance: settings.tolerance, allowNegative: true)
         }
-        if questionType == "integer", expectedBody.contains("rounded"), let dp = settings.dp {
+        if (questionType == "integer" || questionType == "decimal"), expectedBody.contains("rounded"), let dp = settings.dp {
             return scoreRounded(expected: expectedBody, child: child, dp: dp)
         }
         let childBody = questionType == "integer" || questionType == "decimal" ? stripTrailingNoun(child) : child

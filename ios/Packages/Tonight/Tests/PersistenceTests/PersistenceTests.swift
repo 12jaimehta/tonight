@@ -81,8 +81,7 @@ final class PersistenceTests: XCTestCase {
         let bytes = Data([9, 8, 7])
         try PhotoFilePolicy.write(bytes, to: url)
         XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(url))
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+        try assertCompleteProtection(url)
 
         XCTAssertThrowsError(try PhotoAccess(parentUnlocked: false).contents(of: url)) { error in
             XCTAssertEqual(error as? PhotoAccessError, .parentLocked)
@@ -104,5 +103,17 @@ final class PersistenceTests: XCTestCase {
         let unlocked = try PhotoAccess(parentUnlocked: true).contents(of: url)
         XCTAssertTrue(PageJPEG.isJPEG(unlocked))
         XCTAssertEqual(Array(unlocked.prefix(2)), [0xFF, 0xD8])
+    }
+}
+
+/// The iOS Simulator accepts the complete-protection attribute and then omits it.
+/// A device must report it. A simulator that reports a different class still fails.
+private func assertCompleteProtection(_ url: URL, file: StaticString = #filePath, line: UInt = #line) throws {
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    let protection = attributes[.protectionKey] as? FileProtectionType
+    if ProcessInfo.processInfo.environment["SIMULATOR_UDID"] != nil {
+        XCTAssertTrue(protection == nil || protection == .complete, file: file, line: line)
+    } else {
+        XCTAssertEqual(protection, .complete, file: file, line: line)
     }
 }
