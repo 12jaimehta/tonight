@@ -102,7 +102,7 @@ struct SubjectsScreen: View {
                 .accessibilityLabel("Reorder \(name)")
                 .accessibilityIdentifier("subject.handle.\(row.subjectID)")
                 .accessibilityAddTraits(.isButton)
-                .draggable(row.subjectID)
+                .highPriorityGesture(reorderDrag(row.subjectID))
             SubjectBadge(subjectID: row.subjectID, size: 40)
                 .opacity(row.hidden ? 0.4 : 1)
             VStack(alignment: .leading, spacing: 2) {
@@ -133,10 +133,17 @@ struct SubjectsScreen: View {
         .accessibilityAction(named: "Move down") {
             editor.move(row.subjectID, by: 1)
         }
-        .dropDestination(for: String.self) { items, _ in
-            guard let source = items.first else { return false }
-            return editor.move(source, onto: row.subjectID)
-        }
+    }
+
+    private func reorderDrag(_ subjectID: String) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onEnded { value in
+                if value.translation.height > 8 {
+                    editor.move(subjectID, by: 1)
+                } else if value.translation.height < -8 {
+                    editor.move(subjectID, by: -1)
+                }
+            }
     }
 
     private func rowAction(_ title: String, _ symbol: String, _ identifier: String, _ label: String, action: @MainActor @escaping () -> Void) -> some View {
