@@ -1,0 +1,6 @@
+# Local CLI state and secrets. config.toml, migrations, functions, and seed.sql stay tracked.
+.branches
+.temp
+.env
+.env.*
+!.env.example
