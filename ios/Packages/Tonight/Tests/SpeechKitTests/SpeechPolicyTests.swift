@@ -177,7 +177,7 @@ final class SpeechPolicyTests: XCTestCase {
 
     func testCG06_runnerSendsOnlyToTheProxy() async {
         let transport = SpyTransport()
-        await transport.setMode(.succeed(ProxyResponse(transcript: "the cat", words: [], latency: 0.2, cost: Decimal(string: "0.002"))))
+        await transport.setMode(.succeed(ProxyResponse(transcript: "the cat", words: [], latency: 0.2, cost: Decimal(string: "0.002", locale: Locale(identifier: "en_US_POSIX")))))
         let runner = makeRunner(transport: transport, sleeper: NeverSleeper())
         let outcome = await runner.run(
             audio: SpeechAudio(samples: Data([1, 2, 3, 4])),

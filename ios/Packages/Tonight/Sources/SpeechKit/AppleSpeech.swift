@@ -1,6 +1,6 @@
 import AVFoundation
 import Foundation
-import Speech
+@preconcurrency import Speech
 import os
 
 public final class FakeSpeechEngine: SpeechRecognizing, @unchecked Sendable {
@@ -110,7 +110,7 @@ enum SpeechAnalyzerAvailability {
             continuation.finish()
             try await analyzer.finalizeAndFinishThroughEndOfInput()
             var text = ""
-            for try await result in transcriber.results where !result.isVolatile {
+            for try await result in transcriber.results where result.isFinal {
                 text += String(result.text.characters)
             }
             return .transcript(SpeechRecognitionResult(transcript: text, words: [], engineID: .appleOnDevice))
@@ -137,7 +137,7 @@ enum SpeechAnalyzerAvailability {
 final class ResumeOnce: @unchecked Sendable {
     private let done = OSAllocatedUnfairLock(initialState: false)
 
-    func resume(_ body: () -> Void) {
+    func resume(_ body: @Sendable () -> Void) {
         let shouldRun = done.withLock { (done: inout Bool) -> Bool in
             if done { return false }
             done = true
@@ -163,20 +163,24 @@ struct SFSpeechOnDeviceSession {
         let gate = ResumeOnce()
         return await withCheckedContinuation { continuation in
             recognizer.recognitionTask(with: request) { result, error in
+                // Copy Sendable fields here. The resume closure must not capture
+                // SFSpeechRecognitionResult, which the recognition callback may treat as non-Sendable.
                 guard result?.isFinal == true || error != nil else { return }
-                gate.resume {
-                    if let result {
-                        let words = result.bestTranscription.segments.map {
-                            RecognizedWord(text: $0.substring, start: $0.timestamp, duration: $0.duration)
-                        }
-                        continuation.resume(returning: .transcript(SpeechRecognitionResult(
-                            transcript: result.bestTranscription.formattedString,
-                            words: words,
-                            engineID: .appleOnDevice
-                        )))
-                    } else {
-                        continuation.resume(returning: .unavailable("On-device recognition failed"))
+                let outcome: SpeechEngineOutcome
+                if let result {
+                    let words = result.bestTranscription.segments.map {
+                        RecognizedWord(text: $0.substring, start: $0.timestamp, duration: $0.duration)
                     }
+                    outcome = .transcript(SpeechRecognitionResult(
+                        transcript: result.bestTranscription.formattedString,
+                        words: words,
+                        engineID: .appleOnDevice
+                    ))
+                } else {
+                    outcome = .unavailable("On-device recognition failed")
+                }
+                gate.resume {
+                    continuation.resume(returning: outcome)
                 }
             }
         }
@@ -259,17 +263,29 @@ public final class IndianEnglishSpeech: NSObject, SpeechSynthesizing, AVSpeechSy
     }
 
     public func speak(_ text: String, rate: Float = passageRate) async {
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice.speechVoices().first {
-            $0.language.replacingOccurrences(of: "_", with: "-").lowercased().hasPrefix("en-in")
-        } ?? AVSpeechSynthesisVoice(language: "en-IN")
-        utterance.rate = min(max(AVSpeechUtteranceDefaultSpeechRate * rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
-        synthesizer.stopSpeaking(at: .immediate)
-        synthesizer.speak(utterance)
+        await MainActor.run {
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = AVSpeechSynthesisVoice.speechVoices().first {
+                $0.language.replacingOccurrences(of: "_", with: "-").lowercased().hasPrefix("en-in")
+            } ?? AVSpeechSynthesisVoice(language: "en-IN")
+            utterance.rate = min(max(AVSpeechUtteranceDefaultSpeechRate * rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+            self.synthesizer.stopSpeaking(at: .immediate)
+            self.synthesizer.speak(utterance)
+        }
     }
 
     public func stop() {
-        synthesizer.stopSpeaking(at: .immediate)
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                self.synthesizer.stopSpeaking(at: .immediate)
+            }
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    self.synthesizer.stopSpeaking(at: .immediate)
+                }
+            }
+        }
     }
 }
 
