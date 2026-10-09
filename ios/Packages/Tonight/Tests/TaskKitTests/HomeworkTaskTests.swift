@@ -18,6 +18,8 @@ final class HomeworkTaskTests: XCTestCase {
         }
         XCTAssertEqual(task.subjectID, "english")
         XCTAssertEqual(task.checkMode, .auto)
+        XCTAssertEqual(task.activityKind, V1ActivityKind.readAloud)
+        XCTAssertTrue(type(of: task.subjectID) == String.self)
 
         let maths = HomeworkTask.make(childID: child, subjectID: "maths", schoolClass: "1", instruction: "Sums", checkMode: .auto, confirmedText: "2")
         XCTAssertEqual(resultIssues(maths), [.autoIsEnglishOnly])
@@ -47,6 +49,8 @@ final class HomeworkTaskTests: XCTestCase {
         guard case .success(let task) = saved else { return XCTFail("expected a task") }
         XCTAssertEqual(task.pagePhotoRefs.count, 2)
         XCTAssertEqual(task.stars, 2)
+        XCTAssertEqual(task.activityKind, V1ActivityKind.notebook)
+        XCTAssertEqual(ActivityRegistry.v1Kind(subjectID: "hindi"), V1ActivityKind.notebook)
         XCTAssertNil(StarReward(count: 4))
         XCTAssertEqual(StarReward(count: 3)?.count, 3)
 
@@ -79,6 +83,60 @@ final class HomeworkTaskTests: XCTestCase {
         XCTAssertNil(object?["syllabus"])
         XCTAssertNil(object?["chapters"])
         XCTAssertNil(object?["subjectIDs"])
+        XCTAssertNil(object?["subjects"])
+    }
+
+    func testSubjectIDHoldsExactlyOneSubject() throws {
+        let task = try HomeworkTask.make(
+            childID: UUID(),
+            subjectID: "maths",
+            schoolClass: "1",
+            instruction: "Page 14",
+            checkMode: .parent,
+            pagePhotoRefs: [PhotoRef(relativePath: "sums.jpg")]
+        ).get()
+        XCTAssertEqual(task.subjectID, "maths")
+        XCTAssertFalse(task.subjectID.contains(","))
+        XCTAssertEqual(task.activityKind, "notebook")
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(task)) as? [String: Any]
+        XCTAssertEqual(object?["subjectID"] as? String, "maths")
+        XCTAssertNil(object?["subjectIDs"])
+        XCTAssertNil(object?["subjectId"])
+    }
+
+    func testPraiseIsAPresetPlusOptionalText() throws {
+        let praise = Praise(
+            taskID: UUID(),
+            attemptID: UUID(),
+            presetID: "shabash",
+            text: "You kept going",
+            lang: "hi"
+        )
+        XCTAssertEqual(praise.presetPhrase, "शाबाश!")
+        XCTAssertEqual(praise.text, "You kept going")
+        let bare = Praise(taskID: UUID(), presetID: "proud", lang: "en")
+        XCTAssertNil(bare.text)
+        XCTAssertEqual(bare.presetPhrase, "So proud of you")
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(praise)) as? [String: Any]
+        XCTAssertEqual(object?["presetID"] as? String, "shabash")
+        XCTAssertEqual(object?["text"] as? String, "You kept going")
+        XCTAssertNil(object?["voice"])
+        XCTAssertNil(object?["audio"])
+        XCTAssertNil(object?["audioURL"])
+        XCTAssertNil(object?["voiceNote"])
+    }
+
+    func testNotebookAttemptIsAPhotoForParentCheck() throws {
+        let attempt = NotebookAttempt(taskID: UUID(), workPhotoRef: PhotoRef(relativePath: "work.jpg"))
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(attempt)) as? [String: Any]
+        XCTAssertNotNil(object?["workPhotoRef"])
+        XCTAssertNil(object?["audio"])
+        XCTAssertNil(object?["transcript"])
+        let mark = NotebookActivity().score(attempt: ActivityAttempt())
+        XCTAssertEqual(mark.source, .parent)
+        XCTAssertEqual(mark.words, [])
+        XCTAssertNil(ActivityRegistry.v1().activity(kind: "short_answer"))
+        XCTAssertEqual(ActivityRegistry.v1Kind(subjectID: "english"), "read_aloud")
     }
 
     func testAutoCountsWordsAndParentSetsStars() {
@@ -95,7 +153,8 @@ final class HomeworkTaskTests: XCTestCase {
 
     func testANewActivityCanBeRegistered() {
         let registry = ActivityRegistry.v1().registering(SeamActivity())
-        XCTAssertEqual(registry.kinds, ["read_aloud", "seam", "short_answer"])
+        XCTAssertEqual(registry.kinds, ["notebook", "read_aloud", "seam"])
+        XCTAssertNil(registry.activity(kind: "short_answer"))
         let attempt = ActivityAttempt(
             written: WrittenAnswer(prompt: "2+2", text: "4"),
             objective: ObjectiveItem(prompt: "Pick", choiceID: "b")

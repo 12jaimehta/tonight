@@ -1,6 +1,11 @@
 import Foundation
 import MarkingKit
 
+public enum V1ActivityKind {
+    public static let readAloud = "read_aloud"
+    public static let notebook = "notebook"
+}
+
 /// A later class 4–5 activity can carry a written answer. v1 does not present this.
 public struct WrittenAnswer: Codable, Hashable, Sendable {
     public var prompt: String
@@ -48,7 +53,7 @@ public protocol Activity: Sendable {
 }
 
 public struct ReadAloudActivity: Activity {
-    public let kind = "read_aloud"
+    public let kind = V1ActivityKind.readAloud
     public init() {}
 
     public func score(attempt: ActivityAttempt) -> Mark {
@@ -56,12 +61,13 @@ public struct ReadAloudActivity: Activity {
     }
 }
 
-public struct ShortAnswerActivity: Activity {
-    public let kind = "short_answer"
+/// Notebook photo for a non-English subject. The parent checks it. v1 does not auto-mark it.
+public struct NotebookActivity: Activity {
+    public let kind = V1ActivityKind.notebook
     public init() {}
 
     public func score(attempt: ActivityAttempt) -> Mark {
-        Marker().mark(expected: attempt.expectedText, heard: attempt.heardText, options: MarkerOptions(locale: "en-IN"))
+        Mark.notScored(strategyID: "parent-check", source: .parent, locale: "und")
     }
 }
 
@@ -82,11 +88,16 @@ public struct ActivityRegistry: Sendable {
         self.activities = activities
     }
 
+    /// English read-aloud and notebook photo. Typed Short Answer is not in v1.
     public static func v1() -> ActivityRegistry {
         ActivityRegistry(activities: [
-            "read_aloud": ReadAloudActivity(),
-            "short_answer": ShortAnswerActivity(),
+            V1ActivityKind.readAloud: ReadAloudActivity(),
+            V1ActivityKind.notebook: NotebookActivity(),
         ])
+    }
+
+    public static func v1Kind(subjectID: String) -> String {
+        subjectID == HomeworkRules.autoSubjectID ? V1ActivityKind.readAloud : V1ActivityKind.notebook
     }
 
     public func activity(kind: String) -> (any Activity)? {

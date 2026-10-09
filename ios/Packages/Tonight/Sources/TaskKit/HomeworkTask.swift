@@ -77,6 +77,7 @@ public enum HomeworkRules {
 public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
     public var id: UUID
     public var childID: UUID
+    /// Exactly one subject. A task does not store a list of subjects.
     public var subjectID: String
     public var schoolClass: String
     public var instruction: String
@@ -87,6 +88,11 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
     public var showMarkOverride: Bool?
     public var stars: Int?
     public var createdAt: Date
+
+    /// v1 flow for this one subject. English is read-aloud. Anything else is a notebook photo.
+    public var activityKind: String {
+        checkMode == .auto ? V1ActivityKind.readAloud : V1ActivityKind.notebook
+    }
 
     public init(
         id: UUID,
