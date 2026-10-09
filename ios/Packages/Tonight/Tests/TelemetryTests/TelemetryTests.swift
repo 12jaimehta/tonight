@@ -17,7 +17,7 @@ final class TelemetryTests: XCTestCase {
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(log.snapshot()[0])
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertEqual(Set(object?.keys ?? []), ["name", "recordedAt"])
+        XCTAssertEqual(Set(object?.keys.map { $0 } ?? []), ["name", "recordedAt"])
         XCTAssertEqual(object?["name"] as? String, "gate.unlocked")
     }
 
