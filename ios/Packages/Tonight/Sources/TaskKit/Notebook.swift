@@ -1,4 +1,5 @@
 import Foundation
+import MarkingKit
 
 /// The child's photo of notebook work. Non-English subjects wait for a parent check.
 public struct NotebookAttempt: Codable, Hashable, Sendable, Identifiable {
@@ -22,7 +23,8 @@ public struct ParentCheck: Codable, Hashable, Sendable, Identifiable {
     public var stars: Int
     public var checkedAt: Date
 
-    public init(id: UUID = UUID(), attemptID: UUID, stars: Int, checkedAt: Date = Date()) {
+    public init?(id: UUID = UUID(), attemptID: UUID, stars: Int, checkedAt: Date = Date()) {
+        guard let stars = NotebookStars.count(picked: stars) else { return nil }
         self.id = id
         self.attemptID = attemptID
         self.stars = stars

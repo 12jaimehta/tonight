@@ -11,15 +11,15 @@ public enum CheckModeMarking {
         )
     }
 
-    /// The parent looked at the notebook and awarded stars. Nil when the star count is outside 0...3.
+    /// The parent looked at the notebook and awarded stars. Nil unless the count is 1, 2, or 3.
     public static func parent(stars: Int) -> Mark? {
-        guard HomeworkRules.starScale.contains(stars) else { return nil }
+        guard let stars = NotebookStars.count(picked: stars) else { return nil }
         return Mark(
             strategyID: "parent-stars",
             source: .parent,
             locale: "und",
             correct: stars,
-            total: HomeworkRules.starScale.upperBound,
+            total: StarScale.maximum,
             percent: nil,
             words: [],
             missed: []

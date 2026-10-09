@@ -51,8 +51,8 @@ public struct HomeworkDraft: Equatable, Sendable {
 
 public enum HomeworkRules {
     public static let autoSubjectID = "english"
-    /// Placeholder star scale until Tonight Design publishes the reward.
-    public static let starScale = 0...3
+    /// Notebook stars the parent can award. Zero is not a reward.
+    public static let starScale = StarScale.valid
 
     public static func issues(for draft: HomeworkDraft) -> [HomeworkIssue] {
         var issues: [HomeworkIssue] = []
@@ -161,11 +161,11 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
 }
 
 public struct StarReward: Codable, Hashable, Sendable {
-    public static let scale = 0...3
+    public static let scale = StarScale.valid
     public var count: Int
 
     public init?(count: Int) {
-        guard Self.scale.contains(count) else { return nil }
+        guard let count = NotebookStars.count(picked: count) else { return nil }
         self.count = count
     }
 }

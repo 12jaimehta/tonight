@@ -52,7 +52,9 @@ final class HomeworkTaskTests: XCTestCase {
         XCTAssertEqual(task.activityKind, V1ActivityKind.notebook)
         XCTAssertEqual(ActivityRegistry.v1Kind(subjectID: "hindi"), V1ActivityKind.notebook)
         XCTAssertNil(StarReward(count: 4))
+        XCTAssertNil(StarReward(count: 0))
         XCTAssertEqual(StarReward(count: 3)?.count, 3)
+        XCTAssertEqual(StarReward(count: 1)?.count, 1)
 
         let tooMany = HomeworkTask.make(
             childID: child,
@@ -149,6 +151,20 @@ final class HomeworkTaskTests: XCTestCase {
         XCTAssertEqual(stars?.correct, 1)
         XCTAssertEqual(stars?.total, 3)
         XCTAssertNil(CheckModeMarking.parent(stars: -1))
+        XCTAssertNil(CheckModeMarking.parent(stars: 0))
+        XCTAssertNil(ParentCheck(attemptID: UUID(), stars: 0))
+        XCTAssertEqual(ParentCheck(attemptID: UUID(), stars: 2)?.stars, 2)
+
+        let zero = HomeworkTask.make(
+            childID: UUID(),
+            subjectID: "hindi",
+            schoolClass: "1",
+            instruction: "Copy",
+            checkMode: .parent,
+            pagePhotoRefs: [PhotoRef(relativePath: "p.jpg")],
+            stars: 0
+        )
+        XCTAssertEqual(resultIssues(zero), [.starsOutOfRange])
     }
 
     func testANewActivityCanBeRegistered() {
