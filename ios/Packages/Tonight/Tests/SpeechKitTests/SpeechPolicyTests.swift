@@ -357,7 +357,7 @@ actor SpyTransport: ProxyTransporting {
         }
     }
 
-    func cancelAll() { cancelled = true }
+    func cancelAll() async { cancelled = true }
     func wasCancelled() -> Bool { cancelled }
 }
 

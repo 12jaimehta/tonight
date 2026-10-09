@@ -1,16 +1,30 @@
 import AVFoundation
 import Foundation
 import Speech
+import os
 
 public final class FakeSpeechEngine: SpeechRecognizing, @unchecked Sendable {
     public let engineID: SpeechEngineID
-    public var scripted: SpeechEngineOutcome
-    public private(set) var calls = 0
-    private let lock = NSLock()
+    private let state: OSAllocatedUnfairLock<State>
+
+    private struct State: Sendable {
+        var scripted: SpeechEngineOutcome
+        var calls: Int
+    }
+
+    public var scripted: SpeechEngineOutcome {
+        get { state.withLock { $0.scripted } }
+        set { state.withLock { $0.scripted = newValue } }
+    }
+
+    public private(set) var calls: Int {
+        get { state.withLock { $0.calls } }
+        set { state.withLock { $0.calls = newValue } }
+    }
 
     public init(engineID: SpeechEngineID = .fake, scripted: SpeechEngineOutcome) {
         self.engineID = engineID
-        self.scripted = scripted
+        self.state = OSAllocatedUnfairLock(initialState: State(scripted: scripted, calls: 0))
     }
 
     public func availability(locale: String) async -> SpeechAvailability {
@@ -19,10 +33,10 @@ public final class FakeSpeechEngine: SpeechRecognizing, @unchecked Sendable {
     }
 
     public func transcribe(audio: SpeechAudio, locale: String) async -> SpeechEngineOutcome {
-        lock.lock()
-        calls += 1
-        lock.unlock()
-        return scripted
+        state.withLock { state in
+            state.calls += 1
+            return state.scripted
+        }
     }
 }
 
@@ -121,17 +135,15 @@ enum SpeechAnalyzerAvailability {
 }
 
 final class ResumeOnce: @unchecked Sendable {
-    private let lock = NSLock()
-    private var done = false
+    private let done = OSAllocatedUnfairLock(initialState: false)
+
     func resume(_ body: () -> Void) {
-        lock.lock()
-        if done {
-            lock.unlock()
-            return
+        let shouldRun = done.withLock { (done: inout Bool) -> Bool in
+            if done { return false }
+            done = true
+            return true
         }
-        done = true
-        lock.unlock()
-        body()
+        if shouldRun { body() }
     }
 }
 
