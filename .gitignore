@@ -42,3 +42,10 @@ next-env.d.ts
 
 # local homework pages
 /data
+
+# Xcode and Swift package build output
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.hmap
+ios/Packages/Tonight/.build/

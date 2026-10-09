@@ -1,0 +1,24 @@
+included:
+  - Packages/Tonight/Sources
+  - Packages/Tonight/Tests
+  - TonightApp
+
+excluded:
+  - Packages/Tonight/.build
+  - Packages/Tonight/.swiftpm
+
+disabled_rules:
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length
+  - cyclomatic_complexity
+  - identifier_name
+  - trailing_comma
+  - todo
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+
+reporter: xcode
