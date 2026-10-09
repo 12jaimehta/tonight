@@ -54,8 +54,8 @@ public struct ParentalGateSession: Equatable, Sendable {
 
     public mutating func submit(answer: String, to challenge: GateChallenge, now: Date) -> GateVerdict {
         if isLocked(at: now) { return .locked }
-        let digits = answer.unicodeScalars.filter { CharacterSet.decimalDigits.contains($0) }
-        if Int(String(String.UnicodeScalarView(digits))) == challenge.answer {
+        let digits = answer.filter(\.isNumber)
+        if Int(digits) == challenge.answer {
             failures = 0
             lockedUntil = nil
             return .unlocked
