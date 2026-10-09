@@ -117,7 +117,7 @@ struct ReviewSaveScreen: View {
             .font(TonightFont.parent(14, weight: .bold))
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(RoundedRectangle(cornerRadius: 12).fill(selected ? TonightColor.white : TonightColor.pLine.opacity(0.35)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? TonightColor.pAccent : TonightColor.clear, lineWidth: 2))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? TonightColor.pAccent : Color.clear, lineWidth: 2))
             .accessibilityIdentifier(identifier)
             .selectedTrait(selected)
     }

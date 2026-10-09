@@ -233,7 +233,27 @@ public enum AnswerScorer {
         if wordSource.contains(where: \.isLetter), let words = NumberWords.parse(wordSource) { return words }
         let negative = text.hasPrefix("-")
         if negative { text.removeFirst() }
-        guard let digits = ReadingNormalizer.stripGrouping(text.filter { $0 != " " }) else { return nil }
+        let compact = text.filter { $0 != " " }
+        let digits: String
+        if compact.contains(".") {
+            let pieces = compact.split(separator: ".", omittingEmptySubsequences: false)
+            guard pieces.count == 2 else { return nil }
+            let fraction = String(pieces[1])
+            guard fraction.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+            let wholeRaw = String(pieces[0])
+            let whole: String
+            if wholeRaw.isEmpty {
+                whole = "0"
+            } else if let stripped = ReadingNormalizer.stripGrouping(wholeRaw) {
+                whole = stripped
+            } else {
+                return nil
+            }
+            digits = whole + "." + fraction
+        } else {
+            guard let stripped = ReadingNormalizer.stripGrouping(compact) else { return nil }
+            digits = stripped
+        }
         guard let value = Decimal(string: digits, locale: posix) else { return nil }
         return negative ? -value : value
     }
@@ -348,8 +368,17 @@ public enum AnswerScorer {
     private static func stripTrailingNoun(_ raw: String) -> String {
         let parts = raw.split(separator: " ").map(String.init)
         guard parts.count == 2, parts[1].allSatisfy({ $0.isLetter }) else { return raw }
+        // "1 lakh" and "twenty five" are numbers. "7 apples" is a number plus a noun.
+        if numberWords.contains(parts[1].lowercased()) { return raw }
         return parts[0]
     }
+
+    private static let numberWords: Set<String> = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+        "hundred", "thousand", "lakh", "crore",
+    ]
 
     private static func parentheticalStripped(_ raw: String) -> String {
         guard let open = raw.firstIndex(of: "(") else { return raw }
@@ -365,7 +394,8 @@ public enum AnswerScorer {
 
     private static func looksScientific(_ raw: String) -> Bool {
         let text = normalizeDigits(raw).lowercased().filter { !$0.isWhitespace }
-        return text.contains("e") && text.contains(where: \.isNumber)
+        // 1e3 and 6.02e23. Words such as "apples" or "litres" are not scientific notation.
+        return text.range(of: #"\d+(?:\.\d+)?e[+-]?\d+"#, options: .regularExpression) != nil
     }
 
     private static func fractionDigits(_ raw: String) -> Int {

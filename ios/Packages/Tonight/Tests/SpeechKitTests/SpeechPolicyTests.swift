@@ -130,7 +130,7 @@ final class SpeechPolicyTests: XCTestCase {
         registry.delete(childProfileID: child, serverPathOnly: false, at: Date())
         XCTAssertTrue(registry.live(childProfileID: child).isEmpty)
         XCTAssertEqual(registry.live(childProfileID: otherChild).count, 1)
-        XCTAssertNil(store.record(for: child)?.scopeIsActive(.server))
+        XCTAssertEqual(store.record(for: child)?.scopeIsActive(.server), false)
         XCTAssertEqual(store.record(for: child)?.scopeIsActive(.onDevice), false)
     }
 
