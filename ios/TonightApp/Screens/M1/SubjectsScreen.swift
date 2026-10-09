@@ -107,6 +107,8 @@ struct SubjectsScreen: View {
                         .font(TonightFont.parent(CGFloat(TonightType.Text.pXs)))
                         .foregroundStyle(TonightColor.pInkSoft)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("subject.row.\(row.subjectID)")
                 Spacer(minLength: 0)
             }
             HStack(spacing: 8) {
@@ -125,7 +127,7 @@ struct SubjectsScreen: View {
             }
         }
         .frame(minHeight: 60)
-        .accessibilityIdentifier("subject.row.\(row.subjectID)")
+        .accessibilityElement(children: .contain)
     }
 
     private func rowAction(_ title: String, _ symbol: String, _ identifier: String, _ label: String, action: @MainActor @escaping () -> Void) -> some View {
