@@ -7,7 +7,7 @@ import TaskKit
 
 /// First store. There is no earlier schema, so the migration plan is empty.
 public enum TonightSchemaV1: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(1, 0, 0)
+    public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
     public static var models: [any PersistentModel.Type] {
         [

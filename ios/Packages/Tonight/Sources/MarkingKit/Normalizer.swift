@@ -106,8 +106,9 @@ public enum ReadingNormalizer {
     }
 
     static func canonicalNumber(_ raw: String) -> String? {
-        let mapped = String(raw.unicodeScalars.map { asciiDigit($0) })
-        let cleaned = mapped.filter { !isIgnorable($0) }
+        // `map` yields `[Unicode.Scalar]`, which is not a `String` element sequence.
+        let scalars = raw.unicodeScalars.map { asciiDigit($0) }.filter { !isIgnorable($0) }
+        let cleaned = String(String.UnicodeScalarView(scalars))
         if cleaned.contains(".") {
             let pieces = cleaned.split(separator: ".", omittingEmptySubsequences: false)
             guard pieces.count == 2 else { return nil }
@@ -143,7 +144,9 @@ public enum ReadingNormalizer {
 
     static func plain(_ value: Decimal) -> String {
         let number = value as NSDecimalNumber
-        if value == Decimal(integerLiteral: (number as Decimal).intValue) && value.exponent >= 0 {
+        // Keep the exact digit string when the decimal is already an integer.
+        // `Decimal` has no `intValue`; integrality is value == rounded-to-0-places.
+        if value.exponent >= 0 && isIntegral(value) {
             return number.stringValue
         }
         var copy = value
@@ -157,6 +160,14 @@ public enum ReadingNormalizer {
             return trimmed
         }
         return text
+    }
+
+    /// True when rounding to zero decimal places does not change the value.
+    private static func isIntegral(_ value: Decimal) -> Bool {
+        var source = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &source, 0, .plain)
+        return value == rounded
     }
 
     private static func parsePlainDecimal(_ whole: String, fraction: String) -> Decimal? {
