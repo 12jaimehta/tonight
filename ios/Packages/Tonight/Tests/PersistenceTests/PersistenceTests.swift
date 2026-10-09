@@ -94,8 +94,7 @@ final class PersistenceTests: XCTestCase {
         let url = directory.appendingPathComponent("pages/page.jpg")
         try PhotoFilePolicy.write(PageJPEG.bytes, to: url)
         XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(url))
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+        try assertCompleteProtection(url)
 
         XCTAssertThrowsError(try PhotoAccess(parentUnlocked: false).contents(of: url)) { error in
             XCTAssertEqual(error as? PhotoAccessError, .parentLocked)
