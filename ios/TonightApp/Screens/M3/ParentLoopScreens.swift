@@ -305,7 +305,7 @@ struct PraiseChips: View {
                         .background(Capsule().fill(draft.presetID == preset.id ? TonightColor.grapeSoft : TonightColor.white))
                         .overlay(Capsule().stroke(draft.presetID == preset.id ? TonightColor.pAccent : TonightColor.pLine, lineWidth: 1))
                         .accessibilityIdentifier("praise.\(preset.id)")
-                        .accessibilityLanguage(preset.lang)
+                        .environment(\.locale, Locale(identifier: preset.lang))
                         .selectedTrait(draft.presetID == preset.id)
                 }
             }
@@ -360,7 +360,7 @@ struct PraiseMessageScreen: View {
                         .foregroundStyle(TonightColor.grape)
                     Text(praise.text ?? praise.presetPhrase ?? "")
                         .font(TonightFont.child(28))
-                        .accessibilityLanguage(praise.lang)
+                        .environment(\.locale, Locale(identifier: praise.lang))
                     Button(action: onHear) {
                         Image(systemName: "speaker.wave.2.fill")
                             .frame(width: CGFloat(TonightSize.tapChild), height: CGFloat(TonightSize.tapChild))

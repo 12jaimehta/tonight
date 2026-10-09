@@ -99,7 +99,7 @@ struct NewTaskScreen: View {
                 Text(subject.displayName())
                     .font(TonightFont.parent(14, weight: .bold))
                     .foregroundStyle(TonightColor.ink)
-                    .accessibilityLanguage(subject.lang)
+                    .environment(\.locale, Locale(identifier: subject.lang))
             }
             .frame(maxWidth: .infinity, minHeight: 92)
             .padding(8)
