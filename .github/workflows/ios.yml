@@ -1,0 +1,233 @@
+name: iOS
+
+on:
+  pull_request:
+    branches:
+      - ios-v1
+      - ios-m1-m3
+  push:
+    branches:
+      - ios-v1
+      - ios-m1-m3
+
+jobs:
+  package:
+    name: Tonight-Package
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the latest Xcode 26
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apps=(/Applications/Xcode_26*.app)
+          if [[ ${#apps[@]} -eq 0 ]]; then
+            echo "No Xcode 26 application is installed"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          best=""
+          selected=""
+          for app in "${apps[@]}"; do
+            name="$(basename "$app" .app)"
+            version="${name#Xcode_}"
+            if [[ "$version" == *[Bb]eta* || "$version" == *[Pp]review* || "$version" == *Release_Candidate* ]]; then
+              continue
+            fi
+            if [[ ! "$version" =~ ^26(\.[0-9]+)*$ ]]; then
+              continue
+            fi
+            if [[ -z "$best" ]]; then
+              best="$version"
+              selected="$app"
+              continue
+            fi
+            winner="$(printf '%s\n%s\n' "$best" "$version" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1)"
+            if [[ "$winner" == "$version" ]]; then
+              best="$version"
+              selected="$app"
+            fi
+          done
+          if [[ -z "$selected" ]]; then
+            echo "Could not choose an Xcode 26"
+            printf '%s\n' "${apps[@]}"
+            exit 1
+          fi
+          echo "Selecting $selected"
+          sudo xcode-select -s "$selected"
+          xcode-select -p
+          xcodebuild -version
+
+      - name: Build Tonight-Package for testing
+        working-directory: ios/Packages/Tonight
+        run: >
+          xcodebuild build-for-testing
+          -scheme Tonight-Package
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Choose an installed iPhone simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          echo "Available simulators:"
+          xcrun simctl list devices available
+          python3 - << 'PY'
+          import json, os, re, subprocess
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+          data = json.loads(raw)
+          candidates = []
+          for runtime, devices in data.get("devices", {}).items():
+              match = re.search(r"iOS-(\d+(?:-\d+)*)", runtime)
+              if not match:
+                  continue
+              os_ver = match.group(1).replace("-", ".")
+              parts = tuple(int(part) for part in os_ver.split("."))
+              for device in devices:
+                  if not device.get("isAvailable", True):
+                      continue
+                  name = device.get("name", "")
+                  if not name.startswith("iPhone"):
+                      continue
+                  exact = bool(re.fullmatch(r"iPhone \d+", name))
+                  candidates.append((exact, parts, name, os_ver))
+          if not candidates:
+              raise SystemExit("No available iPhone simulator")
+          candidates.sort()
+          exact, parts, name, os_ver = candidates[-1]
+          destination = f"platform=iOS Simulator,name={name},OS={os_ver}"
+          print(f"Using {destination}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"destination={destination}\n")
+          PY
+
+      - name: Test Tonight-Package
+        working-directory: ios/Packages/Tonight
+        run: >
+          xcodebuild test
+          -scheme Tonight-Package
+          -destination '${{ steps.sim.outputs.destination }}'
+          CODE_SIGNING_ALLOWED=NO
+
+  app:
+    name: Tonight app
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect the app project
+        id: app
+        run: |
+          set -euo pipefail
+          if [[ -d ios/Tonight.xcworkspace ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "flag=-workspace" >> "$GITHUB_OUTPUT"
+            echo "path=ios/Tonight.xcworkspace" >> "$GITHUB_OUTPUT"
+          elif [[ -d ios/Tonight.xcodeproj ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "flag=-project" >> "$GITHUB_OUTPUT"
+            echo "path=ios/Tonight.xcodeproj" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Tonight app project is not in this branch; skipping the app build and test."
+          fi
+
+      - name: Select the latest Xcode 26
+        if: steps.app.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apps=(/Applications/Xcode_26*.app)
+          if [[ ${#apps[@]} -eq 0 ]]; then
+            echo "No Xcode 26 application is installed"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          best=""
+          selected=""
+          for app in "${apps[@]}"; do
+            name="$(basename "$app" .app)"
+            version="${name#Xcode_}"
+            if [[ "$version" == *[Bb]eta* || "$version" == *[Pp]review* || "$version" == *Release_Candidate* ]]; then
+              continue
+            fi
+            if [[ ! "$version" =~ ^26(\.[0-9]+)*$ ]]; then
+              continue
+            fi
+            if [[ -z "$best" ]]; then
+              best="$version"
+              selected="$app"
+              continue
+            fi
+            winner="$(printf '%s\n%s\n' "$best" "$version" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1)"
+            if [[ "$winner" == "$version" ]]; then
+              best="$version"
+              selected="$app"
+            fi
+          done
+          if [[ -z "$selected" ]]; then
+            echo "Could not choose an Xcode 26"
+            printf '%s\n' "${apps[@]}"
+            exit 1
+          fi
+          echo "Selecting $selected"
+          sudo xcode-select -s "$selected"
+          xcode-select -p
+          xcodebuild -version
+
+      - name: Build Tonight for testing
+        if: steps.app.outputs.present == 'true'
+        run: >
+          xcodebuild build-for-testing
+          ${{ steps.app.outputs.flag }} ${{ steps.app.outputs.path }}
+          -scheme Tonight
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Choose an installed iPhone simulator
+        id: sim
+        if: steps.app.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          echo "Available simulators:"
+          xcrun simctl list devices available
+          python3 - << 'PY'
+          import json, os, re, subprocess
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+          data = json.loads(raw)
+          candidates = []
+          for runtime, devices in data.get("devices", {}).items():
+              match = re.search(r"iOS-(\d+(?:-\d+)*)", runtime)
+              if not match:
+                  continue
+              os_ver = match.group(1).replace("-", ".")
+              parts = tuple(int(part) for part in os_ver.split("."))
+              for device in devices:
+                  if not device.get("isAvailable", True):
+                      continue
+                  name = device.get("name", "")
+                  if not name.startswith("iPhone"):
+                      continue
+                  exact = bool(re.fullmatch(r"iPhone \d+", name))
+                  candidates.append((exact, parts, name, os_ver))
+          if not candidates:
+              raise SystemExit("No available iPhone simulator")
+          candidates.sort()
+          exact, parts, name, os_ver = candidates[-1]
+          destination = f"platform=iOS Simulator,name={name},OS={os_ver}"
+          print(f"Using {destination}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"destination={destination}\n")
+          PY
+
+      - name: Test Tonight
+        if: steps.app.outputs.present == 'true'
+        run: >
+          xcodebuild test
+          ${{ steps.app.outputs.flag }} ${{ steps.app.outputs.path }}
+          -scheme Tonight
+          -destination '${{ steps.sim.outputs.destination }}'
+          CODE_SIGNING_ALLOWED=NO
