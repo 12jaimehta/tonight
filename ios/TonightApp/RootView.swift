@@ -25,10 +25,16 @@ struct RootView: View {
                 }
             case .childHome:
                 if let child = model.child {
-                    ChildModeEntry(
+                    ChildHomeScreen(
                         child: child,
+                        today: model.today,
                         gate: model.gate,
-                        onLock: model.openGate,
+                        onLock: { model.openGate(for: .exitChild) },
+                        onPlay: model.openChildTask,
+                        onPraise: { praise in
+                            model.today.selectedTaskID = praise.taskID
+                            model.route = .praise
+                        },
                         onKey: model.pressGate,
                         onCloseGate: model.closeGate
                     )
@@ -39,8 +45,8 @@ struct RootView: View {
                     gate: model.gate,
                     onHandPhone: { model.route = .childHome },
                     onNewTask: model.startNewTask,
-                    onSettings: model.openGate,
-                    onOpenTask: { model.today.selectedTaskID = $0 },
+                    onSettings: { model.openGate(for: .settings) },
+                    onOpenTask: model.openTask,
                     onRetry: { model.today.phase = .ready },
                     onKey: model.pressGate,
                     onCloseGate: model.closeGate
@@ -77,6 +83,78 @@ struct RootView: View {
                         onBack: model.backFromReview,
                         onSaveLater: { model.saveDraft(handOff: false) },
                         onSaveHand: { model.saveDraft(handOff: true) }
+                    )
+                }
+            case .readAloud:
+                if let session = model.readAloud, let task = model.task(session.taskID) {
+                    ReadAloudScreen(
+                        session: session,
+                        passage: task.confirmedText ?? "",
+                        pageTitle: "Page 12",
+                        onBack: { model.route = .childHome },
+                        onDone: { Task { @MainActor in await model.finishReading() } },
+                        onGrownUp: { model.openGate(for: .exitChild) }
+                    )
+                }
+            case .childResult:
+                if let child = model.child, let session = model.readAloud, let task = model.task(session.taskID), let mark = (session.mark ?? model.today.marks[task.id]) {
+                    ChildResultScreen(child: child, task: task, mark: mark, onHome: { model.route = .childHome })
+                }
+            case .notebook:
+                if let child = model.child, let session = model.notebook, let task = model.task(session.taskID) {
+                    NotebookScreen(
+                        child: child,
+                        task: task,
+                        session: session,
+                        onBack: { model.route = .childHome },
+                        onSend: model.sendNotebook,
+                        onGrownUp: { model.openGate(for: .exitChild) }
+                    )
+                }
+            case .parentChecksChild:
+                if let child = model.child, let task = model.parentTask {
+                    ParentChecksChildScreen(
+                        child: child,
+                        task: task,
+                        gate: model.gate,
+                        onShow: { model.openGate(for: .parentCheck) },
+                        onLater: { model.route = .childHome },
+                        onKey: model.pressGate,
+                        onCloseGate: model.closeGate
+                    )
+                }
+            case .parentResult:
+                if let child = model.child, let task = model.parentTask, let mark = model.today.marks[task.id] {
+                    ParentResultScreen(
+                        child: child,
+                        task: task,
+                        mark: mark,
+                        praise: model.praiseDraft,
+                        onBack: { model.route = .today },
+                        onToggle: model.setMarkShown,
+                        onSend: model.sendEnglishPraise
+                    )
+                }
+            case .parentCheck:
+                if let child = model.child, let task = model.parentTask {
+                    ParentCheckScreen(
+                        child: child,
+                        task: task,
+                        praise: model.praiseDraft,
+                        onBack: { model.route = .today },
+                        onSend: model.sendParentCheck
+                    )
+                }
+            case .praise:
+                if let child = model.child, let task = model.parentTask, let praise = (model.today.praises.first(where: { $0.taskID == task.id && $0.seenAt == nil }) ?? model.today.praises.last(where: { $0.taskID == task.id })) {
+                    PraiseMessageScreen(
+                        child: child,
+                        task: task,
+                        praise: praise,
+                        stars: model.praiseStars(for: task),
+                        markVisible: model.markVisible(for: task),
+                        onHear: {},
+                        onThanks: { model.thankPraise(praise) }
                     )
                 }
             }

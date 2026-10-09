@@ -1,5 +1,6 @@
 import AuthKit
 import Foundation
+import MarkingKit
 import Observation
 import ProfilesKit
 import TaskKit
@@ -15,6 +16,13 @@ enum TonightRoute: Equatable {
     case addPage
     case checkWords
     case review
+    case readAloud
+    case childResult
+    case notebook
+    case parentChecksChild
+    case parentResult
+    case parentCheck
+    case praise
 
     init?(argument: String) {
         switch argument {
@@ -375,6 +383,10 @@ final class TonightModel {
     var editor: SubjectsEditor?
     var today = TodayModel()
     var draft = NewTaskModel()
+    var readAloud: ReadAloudSession?
+    var notebook: NotebookSession?
+    var praiseDraft = PraiseDraft()
+    var gatePurpose: GatePurpose = .exitChild
     var gate: GateModel
     var authMethod = "email"
     let consentStore = InMemoryAdultConsentStore()
@@ -412,7 +424,7 @@ final class TonightModel {
             if arguments.contains("-TonightNoEnglish") {
                 draft.noEnglish = true
             }
-        case .signIn, .consent, .addChild, .addPage, .checkWords, .review:
+        case .signIn, .consent, .addChild, .addPage, .checkWords, .review, .readAloud, .childResult, .notebook, .parentChecksChild, .parentResult, .parentCheck, .praise:
             break
         }
     }
@@ -577,6 +589,11 @@ final class TonightModel {
     }
 
     func openGate() {
+        openGate(for: gatePurpose)
+    }
+
+    func openGate(for purpose: GatePurpose) {
+        gatePurpose = purpose
         gate.presented = true
         if gate.isLocked {
             gate.notice = "Locked for a minute."
@@ -594,8 +611,13 @@ final class TonightModel {
         case .unlocked:
             gate.presented = false
             ensureToday()
-            if route == .childHome {
-                route = .today
+            switch gatePurpose {
+            case .exitChild, .settings:
+                if route == .childHome || gatePurpose == .exitChild {
+                    route = .today
+                }
+            case .parentCheck:
+                route = .parentCheck
             }
         case .locked:
             gate.presented = false
@@ -606,5 +628,116 @@ final class TonightModel {
 
     func backgrounded() {
         gate.resetForBackground()
+    }
+
+    func openTask(_ id: UUID) {
+        today.selectedTaskID = id
+        guard let task = today.tasks.first(where: { $0.id == id }) else { return }
+        praiseDraft = PraiseDraft()
+        switch today.statuses[id] ?? .todo {
+        case .marked:
+            route = .parentResult
+        case .awaitingCheck, .checked:
+            route = task.checkMode == .parent ? .parentCheck : .parentResult
+        case .todo, .reading:
+            break
+        }
+    }
+
+    func openChildTask(_ task: HomeworkTask) {
+        if today.statuses[task.id] == .awaitingCheck {
+            today.selectedTaskID = task.id
+            route = .parentChecksChild
+            return
+        }
+        let denied = ProcessInfo.processInfo.arguments.contains("-TonightMicDenied")
+        let unavailable = ProcessInfo.processInfo.arguments.contains("-TonightSpeechUnavailable")
+        if task.checkMode == .auto {
+            readAloud = ReadAloudSession(task: task, micDenied: denied, speechUnavailable: unavailable)
+            route = .readAloud
+        } else {
+            let cameraDenied = ProcessInfo.processInfo.arguments.contains("-TonightCameraDenied")
+            notebook = NotebookSession(task: task, denied: cameraDenied)
+            route = .notebook
+        }
+    }
+
+    func finishReading() async {
+        guard let session = readAloud, let task = task(session.taskID) else { return }
+        await session.finish(expected: task.confirmedText ?? "")
+        guard let mark = session.mark else { return }
+        today.marks[task.id] = mark
+        today.statuses[task.id] = .marked(correct: mark.correct, total: mark.total)
+        route = .childResult
+    }
+
+    func sendNotebook() {
+        guard let session = notebook, let photo = session.workPhoto, task(session.taskID) != nil else { return }
+        let attempt = NotebookAttempt(taskID: session.taskID, workPhotoRef: photo)
+        today.notebookAttempts.append(attempt)
+        today.statuses[session.taskID] = .awaitingCheck
+        today.selectedTaskID = session.taskID
+        route = .parentChecksChild
+    }
+
+    func sendParentCheck() {
+        guard let task = parentTask, let stars = praiseDraft.stars else { return }
+        let attempt = today.notebookAttempts.first { $0.taskID == task.id }
+        guard let check = ParentCheck(attemptID: attempt?.id ?? UUID(), stars: stars) else { return }
+        today.parentChecks.append(check)
+        today.statuses[task.id] = .checked(stars: stars)
+        if var stored = today.tasks.first(where: { $0.id == task.id }),
+           let index = today.tasks.firstIndex(where: { $0.id == task.id }) {
+            stored.stars = stars
+            today.tasks[index] = stored
+        }
+        if let praise = praiseDraft.makePraise(taskID: task.id, attemptID: attempt?.id) {
+            today.praises.append(praise)
+        }
+        praiseDraft.sent = true
+    }
+
+    func sendEnglishPraise() {
+        guard let task = parentTask else { return }
+        if let praise = praiseDraft.makePraise(taskID: task.id, attemptID: nil) {
+            today.praises.append(praise)
+        }
+        praiseDraft.sent = true
+    }
+
+    func thankPraise(_ praise: Praise) {
+        guard let index = today.praises.firstIndex(where: { $0.id == praise.id }) else { return }
+        today.praises[index].seenAt = Date()
+        route = .childHome
+    }
+
+    func task(_ id: UUID) -> HomeworkTask? {
+        today.tasks.first { $0.id == id }
+    }
+
+    var parentTask: HomeworkTask? {
+        guard let id = today.selectedTaskID else { return nil }
+        return task(id)
+    }
+
+    func setMarkShown(_ shown: Bool) {
+        guard let id = today.selectedTaskID, let index = today.tasks.firstIndex(where: { $0.id == id }) else { return }
+        today.tasks[index].showMarkOverride = shown
+    }
+
+    func markVisible(for task: HomeworkTask) -> Bool {
+        MarkVisibility.shownToChild(taskOverride: task.showMarkOverride, childDefault: child?.showMarkToChild ?? false)
+    }
+
+    /// Stars stay nil while the mark is hidden, so the child screen has nothing to read out.
+    func praiseStars(for task: HomeworkTask) -> Int? {
+        guard markVisible(for: task) else { return nil }
+        if task.checkMode == .parent {
+            return task.stars ?? today.parentChecks.last(where: { check in
+                today.notebookAttempts.contains { $0.id == check.attemptID && $0.taskID == task.id }
+            })?.stars
+        }
+        guard let mark = today.marks[task.id] else { return nil }
+        return EnglishStars.count(for: mark)
     }
 }

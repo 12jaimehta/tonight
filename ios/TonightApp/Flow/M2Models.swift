@@ -28,6 +28,9 @@ final class TodayModel {
     var tasks: [HomeworkTask] = []
     var statuses: [UUID: TodayTaskState] = [:]
     var marks: [UUID: Mark] = [:]
+    var notebookAttempts: [NotebookAttempt] = []
+    var parentChecks: [ParentCheck] = []
+    var praises: [Praise] = []
     var phase: TodayPhase = .ready
     var weekCount = 0
     var selectedTaskID: UUID?
@@ -87,8 +90,9 @@ final class TodayModel {
         var built: [HomeworkTask] = []
         if case .success(let task) = english {
             built.append(task)
-            statuses[task.id] = .marked(correct: 18, total: 20)
-            marks[task.id] = TodayCopy.sampleMark
+            let mark = TodayCopy.sampleMark()
+            statuses[task.id] = .marked(correct: mark.correct, total: mark.total)
+            marks[task.id] = mark
         }
         if case .success(let task) = maths {
             built.append(task)
@@ -99,6 +103,16 @@ final class TodayModel {
             statuses[task.id] = .todo
         }
         tasks = built
+        if let maths = built.first(where: { $0.subjectID == "maths" }) {
+            notebookAttempts = [
+                NotebookAttempt(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000021") ?? UUID(),
+                    taskID: maths.id,
+                    at: Date(timeIntervalSince1970: 1_700_000_000),
+                    workPhotoRef: PhotoRef(relativePath: "work/maths.jpg")
+                )
+            ]
+        }
     }
 
     static let meera = ProfileRules.make(
@@ -130,17 +144,16 @@ final class TodayModel {
 
 enum TodayCopy {
     static let passage = "Ravi has a red kite. It flies over the roof and past the tall tree by the school every day."
-    static let sampleMark = Mark(
-        strategyID: "word-alignment",
-        source: .auto,
-        locale: "en-IN",
-        asrEngine: "apple_on_device",
-        correct: 18,
-        total: 20,
-        percent: 90,
-        words: [],
-        missed: ["strong", "string"]
-    )
+    /// Drops the last two words so the stored mark is the same one the parent screen shows.
+    static let heard = "Ravi has a red kite. It flies over the roof and past the tall tree by the school."
+
+    static func sampleMark() -> Mark {
+        Marker().mark(
+            expected: passage,
+            heard: heard,
+            options: MarkerOptions(locale: "en-IN", asrEngine: "apple_on_device")
+        )
+    }
 }
 
 struct DraftLine: Identifiable, Equatable {

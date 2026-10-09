@@ -149,7 +149,7 @@ struct TodayScreen: View {
                 SubjectBadge(subjectID: subjectID, size: 32)
                 Text(title)
                     .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .bold))
-                if let display = row?.displayName, let english = record?.nameEn {
+                if row?.displayName != nil, let english = record?.nameEn {
                     Text(english)
                         .font(TonightFont.parent(CGFloat(TonightType.Text.pXs)))
                         .foregroundStyle(TonightColor.pInkSoft)

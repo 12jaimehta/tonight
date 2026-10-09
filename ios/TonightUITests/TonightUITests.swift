@@ -1,6 +1,8 @@
 import XCTest
 
 final class TonightUITests: XCTestCase {
+    // Camera capture, the microphone, on-device speech recognition, and spoken playback
+    // are not driven here. Those screens show their denied and idle states without the hardware.
     func testSignInPlaceholderContinues() {
         let app = launch()
         app.buttons["signin.apple"].tap()
@@ -56,10 +58,11 @@ final class TonightUITests: XCTestCase {
 
     func testFixedGateUnlocksWithTheFirstProduct() {
         let app = launch(screen: "child")
-        XCTAssertTrue(app.staticTexts["English"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.staticTexts["हिन्दी"].exists)
-        XCTAssertTrue(app.staticTexts["Maths"].exists)
-        XCTAssertTrue(app.staticTexts["EVS"].exists)
+        XCTAssertTrue(app.buttons["subject.english"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["subject.english"].label.contains("English"))
+        XCTAssertTrue(app.buttons["subject.hindi"].label.contains("हिन्दी"))
+        XCTAssertTrue(app.buttons["subject.maths"].label.contains("Maths"))
+        XCTAssertTrue(app.buttons["subject.evs"].label.contains("EVS"))
         app.buttons["child.lock"].tap()
         XCTAssertTrue(app.staticTexts["47 × 36"].waitForExistence(timeout: 5))
         tapDigits(["1", "6", "9", "2"], in: app)
