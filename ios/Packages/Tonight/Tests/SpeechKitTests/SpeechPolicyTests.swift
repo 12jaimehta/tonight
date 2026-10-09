@@ -138,7 +138,7 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertNoThrow(try TonightEndpoints.validate(TonightEndpoints.proxyBaseURL))
         let speech = try SarvamProxyConfiguration().speechURL()
         XCTAssertEqual(speech.host, "project-ref.supabase.co")
-        XCTAssertEqual(speech.path, "/functions/v1/sarvam-speech")
+        XCTAssertEqual(speech.path, "/functions/v1/sarvam-proxy")
         for host in ["api.sarvam.ai", "firebaseio.com", "api.openai.com", "app-measurement.com", "example.supabase.co"] {
             XCTAssertThrowsError(try TonightEndpoints.validate(URL(string: "https://\(host)/speech")!))
         }
@@ -189,7 +189,7 @@ final class SpeechPolicyTests: XCTestCase {
         let posts = await transport.posts
         XCTAssertEqual(posts.count, 1)
         XCTAssertEqual(posts[0].url.host, "project-ref.supabase.co")
-        XCTAssertEqual(posts[0].url.path, "/functions/v1/sarvam-speech")
+        XCTAssertEqual(posts[0].url.path, "/functions/v1/sarvam-proxy")
         XCTAssertNil(posts[0].headers["x-api-key"])
         XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("sarvam") })
         let body = try! JSONSerialization.jsonObject(with: posts[0].body) as! [String: String]

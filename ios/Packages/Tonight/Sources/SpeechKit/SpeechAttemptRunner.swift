@@ -198,7 +198,7 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
     }
 
     /// Placeholder Edge Function name. The Sarvam key stays in the function, not in the app.
-    public static let functionName = "sarvam-speech"
+    public static let functionName = "sarvam-proxy"
 
     public func speechURL() throws -> URL {
         let url = baseURL
