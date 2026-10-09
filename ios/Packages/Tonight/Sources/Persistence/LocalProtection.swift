@@ -26,11 +26,11 @@ public enum PhotoFilePolicy {
     public static func write(_ data: Data, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: [.atomic, .completeFileProtection])
-        try LocalProtection.protect(url)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         var copy = url
         try copy.setResourceValues(values)
+        try LocalProtection.protect(url)
     }
 
     public static func isExcludedFromBackup(_ url: URL) throws -> Bool {
