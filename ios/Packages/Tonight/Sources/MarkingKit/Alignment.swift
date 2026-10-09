@@ -2,7 +2,8 @@ import Foundation
 
 /// Global word alignment (Needleman–Wunsch) with a fixed tie-break.
 /// Match cost 0, substitution cost 2, insertion or omission cost 1.
-/// When costs tie: prefer a real match, then omitting an expected word, then an insertion, then a substitution.
+/// When costs tie: prefer a real match, then a substitution, then omitting an expected word, then an insertion.
+/// A single mismatched word is a substitution, not an omission plus an insertion.
 ///
 /// Each heard token pairs with at most one expected token. A word that was not spoken
 /// is omitted or substituted, never matched. Fuzzy edit-distance is off unless asked.
@@ -30,9 +31,9 @@ enum WordAligner {
             for row in 1...rows {
                 for column in 1...columns {
                     let same = tokensMatch(expected[row - 1], heard[column - 1], fuzzy: fuzzy)
-                    var best = Candidate(cost: cost[row - 1][column - 1] + (same ? 0 : 2), priority: same ? 0 : 3, step: same ? .match : .substitute)
-                    let omit = Candidate(cost: cost[row - 1][column] + 1, priority: 1, step: .omit)
-                    let insert = Candidate(cost: cost[row][column - 1] + 1, priority: 2, step: .insert)
+                    var best = Candidate(cost: cost[row - 1][column - 1] + (same ? 0 : 2), priority: same ? 0 : 1, step: same ? .match : .substitute)
+                    let omit = Candidate(cost: cost[row - 1][column] + 1, priority: 2, step: .omit)
+                    let insert = Candidate(cost: cost[row][column - 1] + 1, priority: 3, step: .insert)
                     if omit.isBetter(than: best) { best = omit }
                     if insert.isBetter(than: best) { best = insert }
                     cost[row][column] = best.cost

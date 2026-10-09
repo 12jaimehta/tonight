@@ -30,6 +30,12 @@ public enum ReadingNormalizer {
                 continue
             }
             if isDigit(scalar) {
+                // "word12" is one token. A digit only starts a number when it is not already inside a word.
+                if !word.isEmpty {
+                    word.unicodeScalars.append(asciiDigit(scalar))
+                    index += 1
+                    continue
+                }
                 flushWord()
                 let (token, next) = consumeNumber(scalars, from: index)
                 tokens.append(token)
