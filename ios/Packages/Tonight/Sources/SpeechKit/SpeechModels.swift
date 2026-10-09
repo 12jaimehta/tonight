@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The only network host the app may contact.
 /// `project-ref` stands in for the real Supabase project ref. The Mumbai project is not created yet.
@@ -90,39 +91,34 @@ public struct AudioConsentRecord: Codable, Sendable, Equatable, Identifiable {
 
 /// In-memory consent stub. The consent screen waits on design (T-008).
 public final class AudioConsentStore: @unchecked Sendable {
-    private let lock = NSLock()
-    private var records: [UUID: AudioConsentRecord] = [:]
+    private let records = OSAllocatedUnfairLock(initialState: [UUID: AudioConsentRecord]())
 
     public init() {}
 
     public func record(for childProfileID: UUID) -> AudioConsentRecord? {
-        lock.lock()
-        defer { lock.unlock() }
-        return records[childProfileID]
+        records.withLock { $0[childProfileID] }
     }
 
     public func grant(_ record: AudioConsentRecord) {
-        lock.lock()
-        records[record.childProfileID] = record
-        lock.unlock()
+        records.withLock { $0[record.childProfileID] = record }
     }
 
     /// Cancelling the consent screen stores nothing (CG-11).
     public func cancelDraft() {}
 
     public func withdraw(childProfileID: UUID, scopes: Set<AudioConsentScope>, at date: Date) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard var record = records[childProfileID] else { return }
-        if scopes.contains(.onDevice) {
-            record.withdrawnAt = date
-            record.withdrawnScopes.formUnion([.onDevice, .server])
-            record.scopes.subtract([.onDevice, .server])
-        } else {
-            record.withdrawnScopes.formUnion(scopes)
-            record.scopes.subtract(scopes)
+        records.withLock { records in
+            guard var record = records[childProfileID] else { return }
+            if scopes.contains(.onDevice) {
+                record.withdrawnAt = date
+                record.withdrawnScopes.formUnion([.onDevice, .server])
+                record.scopes.subtract([.onDevice, .server])
+            } else {
+                record.withdrawnScopes.formUnion(scopes)
+                record.scopes.subtract(scopes)
+            }
+            records[childProfileID] = record
         }
-        records[childProfileID] = record
     }
 }
 

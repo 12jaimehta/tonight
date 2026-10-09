@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// A closed list of first-party names. Events carry a name and a time.
 public enum TonightEventName: String, Codable, CaseIterable, Sendable, Equatable {
@@ -27,22 +28,17 @@ public struct TonightEvent: Codable, Equatable, Sendable {
 }
 
 public final class TonightEventLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var events: [TonightEvent] = []
+    private let events = OSAllocatedUnfairLock(initialState: [TonightEvent]())
 
     public init() {}
 
     public func record(_ name: TonightEventName, at date: Date = Date()) {
         let event = TonightEvent(name: name, recordedAt: date)
-        lock.lock()
-        events.append(event)
-        lock.unlock()
+        events.withLock { $0.append(event) }
     }
 
     public func snapshot() -> [TonightEvent] {
-        lock.lock()
-        defer { lock.unlock() }
-        return events
+        events.withLock { $0 }
     }
 }
 
