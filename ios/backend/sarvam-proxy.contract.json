@@ -1,0 +1,35 @@
+{
+  "name": "sarvam-proxy",
+  "status": "assumed",
+  "notes": "The iOS client posts this shape and reads transcript, latencyMs, and cost. Word timings are not parsed yet. The hostname is a placeholder. No vendor key is sent by the app.",
+  "request": {
+    "method": "POST",
+    "path": "/functions/v1/sarvam-proxy",
+    "placeholderHost": "project-ref.supabase.co",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["locale", "audioBase64", "contentType", "consentRecordId", "consentVersion"],
+      "properties": {
+        "locale": { "type": "string", "example": "en-IN" },
+        "audioBase64": { "type": "string" },
+        "contentType": { "type": "string", "const": "audio/wav" },
+        "consentRecordId": { "type": "string" },
+        "consentVersion": { "type": "string", "example": "2026-10-09" }
+      }
+    },
+    "timeoutSeconds": 8
+  },
+  "response": {
+    "type": "object",
+    "required": ["transcript"],
+    "properties": {
+      "transcript": { "type": "string" },
+      "latencyMs": { "type": "number" },
+      "cost": { "type": "string", "example": "0.002" }
+    }
+  }
+}
