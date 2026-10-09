@@ -2,7 +2,7 @@ import DesignSystem
 import ProfilesKit
 import SwiftUI
 
-/// M2-03. The scanner and the photo library are not opened. "From Photos" attaches an in-app sample page.
+/// M2-03. The scanner and the photo library are not opened. "From Photos" writes a JPEG into the app directory.
 struct AddPageScreen: View {
     var child: ChildProfile
     @Bindable var draft: NewTaskModel

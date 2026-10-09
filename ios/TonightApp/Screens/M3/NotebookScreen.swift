@@ -3,7 +3,7 @@ import ProfilesKit
 import SwiftUI
 import TaskKit
 
-/// M3-04 Notebook. The shutter stores an in-app photo reference and does not open the camera.
+/// M3-04 Notebook. The shutter writes a JPEG into the app directory and does not open the camera.
 struct NotebookScreen: View {
     var child: ChildProfile
     var task: HomeworkTask

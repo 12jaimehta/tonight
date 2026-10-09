@@ -16,6 +16,12 @@ final class CaptureKitTests: XCTestCase {
         XCTAssertEqual(contents.count, 1)
     }
 
+    func testPageJPEGStartsWithTheJPEGMarker() {
+        XCTAssertTrue(PageJPEG.isJPEG(PageJPEG.bytes))
+        XCTAssertEqual(Array(PageJPEG.bytes.prefix(2)), [0xFF, 0xD8])
+        XCTAssertGreaterThan(PageJPEG.bytes.count, 2)
+    }
+
     func testOCREngineIsAProtocol() async {
         let engine = ScriptedOCR(lines: [OCRLine(text: "the cat")])
         let lines = await engine.recognize(CapturedPageImage(bytes: Data([1]), capturedAt: Date()))

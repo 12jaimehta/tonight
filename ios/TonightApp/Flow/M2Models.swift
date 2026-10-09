@@ -164,13 +164,17 @@ struct DraftLine: Identifiable, Equatable {
     var editing: Bool
 }
 
-/// Static stand-in for Vision. The button reads these lines; it does not open the camera.
+/// Static stand-in for Vision. It still runs on the captured JPEG bytes.
 struct PlaceholderOCR: OCREngine {
     var lines: [OCRLine]
 
-    func recognize(_ image: CapturedPageImage) async -> [OCRLine] {
-        _ = image
+    func lines(for image: CapturedPageImage) -> [OCRLine] {
+        guard PageJPEG.isJPEG(image.bytes) else { return [] }
         return lines
+    }
+
+    func recognize(_ image: CapturedPageImage) async -> [OCRLine] {
+        lines(for: image)
     }
 }
 
@@ -194,6 +198,7 @@ final class NewTaskModel {
     var manualText = ""
     var lines: [DraftLine] = []
     var captured: CapturedPageImage?
+    var pageRelativePath: String?
     var markChoice: MarkChoice = .useDefault
     var saving = false
     var editingLineID: Int?
@@ -263,7 +268,15 @@ final class NewTaskModel {
     }
 
     func attachSamplePage() {
-        let image = CapturedPageImage(bytes: Data([0xFF, 0xD8, 0xFF]), capturedAt: Date())
+        let relative = "pages/\(UUID().uuidString).jpg"
+        let ref: PhotoRef
+        do {
+            ref = try AppPhotoFiles.writeJPEG(relativePath: relative)
+        } catch {
+            return
+        }
+        let image = CapturedPageImage(bytes: PageJPEG.bytes, capturedAt: Date())
+        pageRelativePath = ref.relativePath
         captured = image
         pageAttached = true
         cameraDenied = false
@@ -273,22 +286,27 @@ final class NewTaskModel {
             manualFallback = true
             return
         }
-        if let placeholder = ocr as? PlaceholderOCR {
-            lines = placeholder.lines.enumerated().map { index, line in
-                DraftLine(id: index, text: line.text, included: true, uncertain: index == 1, editing: false)
-            }
+        applyPlaceholderOCR(image)
+    }
+
+    private func applyPlaceholderOCR(_ image: CapturedPageImage) {
+        guard let placeholder = ocr as? PlaceholderOCR else { return }
+        let recognized = placeholder.lines(for: image)
+        lines = recognized.enumerated().map { index, line in
+            DraftLine(id: index, text: line.text, included: true, uncertain: index == 1, editing: false)
         }
     }
 
     func rescan() {
         pageAttached = false
+        pageRelativePath = nil
         captured = nil
         lines = []
     }
 
     func makeTask(child: ChildProfile) -> HomeworkTask? {
         guard canSave else { return nil }
-        let photos = pageAttached ? [PhotoRef(relativePath: "pages/sample-page.jpg")] : []
+        let photos = pageRelativePath.map { [PhotoRef(relativePath: $0)] } ?? []
         let text = checkMode == .auto ? confirmedText : nil
         let result = HomeworkTask.make(
             childID: child.id,

@@ -15,6 +15,7 @@
 		A10000000000000000000056 /* TaskKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000046 /* TaskKit */; };
 		A10000000000000000000057 /* MarkingKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000047 /* MarkingKit */; };
 		A10000000000000000000058 /* CaptureKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000048 /* CaptureKit */; };
+		A10000000000000000000059 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000049 /* Persistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +72,7 @@
 				A10000000000000000000056 /* TaskKit in Frameworks */,
 				A10000000000000000000057 /* MarkingKit in Frameworks */,
 				A10000000000000000000058 /* CaptureKit in Frameworks */,
+				A10000000000000000000059 /* Persistence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +132,7 @@
 				A10000000000000000000046 /* TaskKit */,
 				A10000000000000000000047 /* MarkingKit */,
 				A10000000000000000000048 /* CaptureKit */,
+				A10000000000000000000049 /* Persistence */,
 			);
 			productName = Tonight;
 			productReference = A10000000000000000000012 /* Tonight.app */;
@@ -470,6 +473,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
 			productName = CaptureKit;
+		};
+		A10000000000000000000049 /* Persistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = Persistence;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

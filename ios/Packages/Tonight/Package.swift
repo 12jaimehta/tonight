@@ -55,7 +55,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PersistenceTests",
-            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit"]
+            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit", "CaptureKit"]
         ),
 
         .target(name: "Telemetry"),

@@ -1,4 +1,5 @@
 import AuthKit
+import CaptureKit
 import PracticeKit
 import ProfilesKit
 import SwiftData
@@ -87,5 +88,21 @@ final class PersistenceTests: XCTestCase {
             XCTAssertEqual(error as? PhotoAccessError, .parentLocked)
         }
         XCTAssertEqual(try PhotoAccess(parentUnlocked: true).contents(of: url), bytes)
+    }
+
+    func testJPEGBytesAreReadableOnlyWhenTheParentIsUnlocked() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("pages/page.jpg")
+        try PhotoFilePolicy.write(PageJPEG.bytes, to: url)
+        XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(url))
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+
+        XCTAssertThrowsError(try PhotoAccess(parentUnlocked: false).contents(of: url)) { error in
+            XCTAssertEqual(error as? PhotoAccessError, .parentLocked)
+        }
+        let unlocked = try PhotoAccess(parentUnlocked: true).contents(of: url)
+        XCTAssertTrue(PageJPEG.isJPEG(unlocked))
+        XCTAssertEqual(Array(unlocked.prefix(2)), [0xFF, 0xD8])
     }
 }

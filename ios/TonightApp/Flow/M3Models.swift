@@ -226,7 +226,9 @@ final class NotebookSession {
     }
 
     func shutter() {
-        workPhoto = PhotoRef(relativePath: "work/\(taskID.uuidString).jpg")
+        let relative = "work/\(taskID.uuidString).jpg"
+        guard let ref = try? AppPhotoFiles.writeJPEG(relativePath: relative) else { return }
+        workPhoto = ref
         phase = .confirm
     }
 
