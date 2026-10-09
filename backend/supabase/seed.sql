@@ -1,0 +1,3 @@
+-- Minimal local seed. No people, no children, no audio.
+-- A parent row points at auth.users, so it is created after a local sign-in,
+-- not from this file.
