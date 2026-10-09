@@ -80,7 +80,7 @@ public struct ChandaView: View {
 
     private var mouth: some View {
         let smile = mood == .tryAgain ? 0.35 : 1.0
-        Smile(open: mood == .success)
+        return Smile(open: mood == .success)
             .stroke(TonightColor.ink, style: StrokeStyle(lineWidth: max(2, size * 0.04), lineCap: .round))
             .frame(width: size * 0.28, height: size * 0.14 * smile)
             .offset(y: size * 0.16)
