@@ -134,12 +134,15 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertEqual(store.record(for: child)?.scopeIsActive(.onDevice), false)
     }
 
-    func testAllowlistRejectsThirdPartiesAndDirectSarvam() {
+    func testAllowlistRejectsThirdPartiesAndDirectSarvam() throws {
         XCTAssertNoThrow(try TonightEndpoints.validate(TonightEndpoints.proxyBaseURL))
+        let speech = try SarvamProxyConfiguration().speechURL()
+        XCTAssertEqual(speech.host, "project-ref.supabase.co")
+        XCTAssertEqual(speech.path, "/functions/v1/sarvam-speech")
         for host in ["api.sarvam.ai", "firebaseio.com", "api.openai.com", "app-measurement.com", "example.supabase.co"] {
             XCTAssertThrowsError(try TonightEndpoints.validate(URL(string: "https://\(host)/speech")!))
         }
-        XCTAssertThrowsError(try TonightEndpoints.validate(URL(string: "http://proxy.tonight.invalid")!))
+        XCTAssertThrowsError(try TonightEndpoints.validate(URL(string: "http://project-ref.supabase.co")!))
     }
 
     func testProxyURLIsTheOnlyConfiguredHost() throws {
@@ -151,7 +154,8 @@ final class SpeechPolicyTests: XCTestCase {
         let package = root.appendingPathComponent("Package.swift")
         let text = try sourceText(at: sources) + (try String(contentsOf: package))
         XCTAssertFalse(text.contains("firebase"), "NET-02b")
-        XCTAssertFalse(text.contains("supabase"), "NET-02b")
+        XCTAssertFalse(text.contains("import Supabase"), "NET-02b")
+        XCTAssertFalse(text.contains("supabase-swift"), "NET-02b")
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
@@ -159,7 +163,8 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(Set(urls), ["https://proxy.tonight.invalid"])
+        XCTAssertEqual(urls.count, 1)
+        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
     }
 
     func testForegroundSessionIsNotABackgroundSession() {
@@ -183,7 +188,8 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertGreaterThan(outcome.bytesSent, 0)
         let posts = await transport.posts
         XCTAssertEqual(posts.count, 1)
-        XCTAssertEqual(posts[0].url.host, "proxy.tonight.invalid")
+        XCTAssertEqual(posts[0].url.host, "project-ref.supabase.co")
+        XCTAssertEqual(posts[0].url.path, "/functions/v1/sarvam-speech")
         XCTAssertNil(posts[0].headers["x-api-key"])
         XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("sarvam") })
         let body = try! JSONSerialization.jsonObject(with: posts[0].body) as! [String: String]

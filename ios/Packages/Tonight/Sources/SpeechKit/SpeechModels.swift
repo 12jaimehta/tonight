@@ -1,16 +1,16 @@
 import Foundation
 
-/// The only network host the app may contact. The real hostname is not chosen yet.
-/// `.invalid` is a reserved TLD and does not resolve. Replace this one value when Engineering names the proxy.
+/// The only network host the app may contact.
+/// `project-ref` stands in for the real Supabase project ref. The Mumbai project is not created yet.
 public enum TonightEndpoints {
-    public static let proxyBaseURL = URL(string: "https://proxy.tonight.invalid")!
-    public static let allowedHosts: Set<String> = ["proxy.tonight.invalid"]
+    public static let proxyBaseURL = URL(string: "https://project-ref.supabase.co")!
+    public static let allowedHosts: Set<String> = ["project-ref.supabase.co"]
 
     public static let deniedHostFragments = [
         "fire" + "base", "googleapis.com", "google-analytics", "crashlytics",
         "sentry.io", "bugsnag", "mixpanel", "amplitude", "segment.io",
         "appsflyer", "adjust.com", "branch.io", "doubleclick", "openai.com",
-        "sarvam.ai", "supa" + "base.co",
+        "sarvam.ai",
     ]
 
     public static func validate(_ url: URL) throws {

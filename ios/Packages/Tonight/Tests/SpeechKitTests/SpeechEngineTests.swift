@@ -96,8 +96,11 @@ final class SpeechEngineTests: XCTestCase {
         XCTAssertEqual(store.record(for: child)?.scopeIsActive(.server), false)
     }
 
-    func testAllowlistRejectsOtherHosts() {
+    func testAllowlistRejectsOtherHosts() throws {
         XCTAssertNoThrow(try TonightEndpoints.validate(TonightEndpoints.proxyBaseURL))
+        let speech = try SarvamProxyConfiguration().speechURL()
+        XCTAssertEqual(speech.host, "project-ref.supabase.co")
+        XCTAssertEqual(speech.path, "/functions/v1/sarvam-speech")
         XCTAssertEqual(OnDeviceRequestPolicy.requiresOnDeviceRecognition, true)
         XCTAssertEqual(OnDeviceRequestPolicy.localeIdentifier, "en-IN")
         XCTAssertEqual(OnDeviceRequestPolicy.serverTimeout, 8)
@@ -115,7 +118,8 @@ final class SpeechEngineTests: XCTestCase {
         let package = root.appendingPathComponent("Package.swift")
         let text = try sourceText(at: sources) + (try String(contentsOf: package))
         XCTAssertFalse(text.contains("firebase"))
-        XCTAssertFalse(text.contains("supabase"))
+        XCTAssertFalse(text.contains("import Supabase"))
+        XCTAssertFalse(text.contains("supabase-swift"))
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
@@ -123,7 +127,8 @@ final class SpeechEngineTests: XCTestCase {
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(Set(urls), ["https://proxy.tonight.invalid"])
+        XCTAssertEqual(urls.count, 1)
+        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
     }
 
     func testAudioStorageIsMemoryOnly() {
