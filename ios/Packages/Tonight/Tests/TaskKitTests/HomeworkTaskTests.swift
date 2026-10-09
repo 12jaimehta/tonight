@@ -185,10 +185,10 @@ final class HomeworkTaskTests: XCTestCase {
         XCTAssertEqual(read.correct, 2)
     }
 
-    private func resultIssues(_ result: Result<HomeworkTask, [HomeworkIssue]>) -> [HomeworkIssue] {
+    private func resultIssues(_ result: Result<HomeworkTask, HomeworkRulesError>) -> [HomeworkIssue] {
         switch result {
         case .success: return []
-        case .failure(let issues): return issues
+        case .failure(let error): return error.issues
         }
     }
 }

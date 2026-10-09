@@ -111,7 +111,7 @@ struct SubjectsScreen: View {
                     .foregroundStyle(TonightColor.ink)
                     .opacity(row.hidden ? 0.4 : 1)
                     .environment(\.layoutDirection, record?.dir == .rtl ? .rightToLeft : .leftToRight)
-                    .accessibilityLanguage(record?.lang ?? "en")
+                    .environment(\.locale, Locale(identifier: record?.lang ?? "en"))
                 Text(subtitle(row, record: record))
                     .font(TonightFont.parent(CGFloat(TonightType.Text.pXs)))
                     .foregroundStyle(TonightColor.pInkSoft)
@@ -178,7 +178,7 @@ struct SubjectsScreen: View {
                     .foregroundStyle(TonightColor.ink)
                     .lineLimit(1)
                     .environment(\.layoutDirection, record?.dir == .rtl ? .rightToLeft : .leftToRight)
-                    .accessibilityLanguage(record?.lang ?? "en")
+                    .environment(\.locale, Locale(identifier: record?.lang ?? "en"))
                 if let record, record.lang != "en" {
                     Text(record.nameEn)
                         .font(TonightFont.parent(11))

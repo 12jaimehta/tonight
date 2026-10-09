@@ -116,7 +116,7 @@ public struct RoundToyButtonStyle: ButtonStyle {
         let pressed = configuration.isPressed
         let edgeDrop: CGFloat = pressed ? 2 : CGFloat(TonightEdge.toy)
         let sink: CGFloat = pressed ? CGFloat(TonightEdge.pressDepth) : 0
-        configuration.label
+        return configuration.label
             .font(TonightFont.child(16))
             .foregroundStyle(foreground)
             .frame(width: diameter, height: diameter)

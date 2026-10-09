@@ -185,7 +185,7 @@ struct ChildHomeScreen: View {
                     .font(TonightFont.child(CGFloat(TonightType.Text.cLabel)))
                     .foregroundStyle(TonightColor.ink)
                     .opacity(card.state == .resting ? 0.55 : 1)
-                    .accessibilityLanguage(record?.lang ?? "en")
+                    .environment(\.locale, Locale(identifier: record?.lang ?? "en"))
                     .environment(\.layoutDirection, record?.dir == .rtl ? .rightToLeft : .leftToRight)
                 chip(card.state)
             }

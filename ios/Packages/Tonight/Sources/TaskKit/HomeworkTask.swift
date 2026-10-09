@@ -1,4 +1,5 @@
 import Foundation
+import MarkingKit
 
 public enum CheckMode: String, Codable, Hashable, Sendable {
     case auto
@@ -31,6 +32,15 @@ public enum HomeworkIssue: String, Equatable, Sendable {
     case autoNeedsConfirmedText
     case parentNeedsPhoto
     case starsOutOfRange
+}
+
+/// Rule failures from making a homework task. An array of issues is not itself an Error.
+public struct HomeworkRulesError: Error, Equatable, Sendable {
+    public var issues: [HomeworkIssue]
+
+    public init(issues: [HomeworkIssue]) {
+        self.issues = issues
+    }
 }
 
 public struct HomeworkDraft: Equatable, Sendable {
@@ -133,7 +143,7 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
         pagePhotoRefs: [PhotoRef] = [],
         stars: Int? = nil,
         createdAt: Date = Date()
-    ) -> Result<HomeworkTask, [HomeworkIssue]> {
+    ) -> Result<HomeworkTask, HomeworkRulesError> {
         let draft = HomeworkDraft(
             subjectID: subjectID,
             checkMode: checkMode,
@@ -142,7 +152,7 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
             stars: stars
         )
         let issues = HomeworkRules.issues(for: draft)
-        guard issues.isEmpty else { return .failure(issues) }
+        guard issues.isEmpty else { return .failure(HomeworkRulesError(issues: issues)) }
         return .success(HomeworkTask(
             id: id,
             childID: childID,

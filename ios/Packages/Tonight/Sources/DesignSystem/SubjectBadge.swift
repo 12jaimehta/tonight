@@ -38,7 +38,7 @@ public struct SubjectBadge: View {
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(subject?.nameEn ?? subjectID)
-        .accessibilityLanguage(subject?.lang ?? "en")
+        .environment(\.locale, Locale(identifier: subject?.lang ?? "en"))
     }
 
     @ViewBuilder
