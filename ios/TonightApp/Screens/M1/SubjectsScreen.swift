@@ -2,7 +2,7 @@ import DesignSystem
 import ProfilesKit
 import SwiftUI
 
-/// M1-04. Rename, hide, and reorder. Hiding the last visible subject is blocked.
+/// M1-04. Rename, hide, and reorder with a drag handle. Hiding the last visible subject is blocked.
 struct SubjectsScreen: View {
     @Bindable var editor: SubjectsEditor
     var onBack: @MainActor () -> Void
@@ -92,40 +92,50 @@ struct SubjectsScreen: View {
     private func subjectRow(_ row: ChildSubject) -> some View {
         let record = SubjectCatalog.record(row.subjectID)
         let title = row.displayName ?? record?.displayName() ?? row.subjectID
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                SubjectBadge(subjectID: row.subjectID, size: 40)
+        let name = record?.nameEn ?? row.subjectID
+        return HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(TonightColor.pInkSoft)
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Reorder \(name)")
+                .accessibilityIdentifier("subject.handle.\(row.subjectID)")
+                .accessibilityAddTraits(.isButton)
+                .draggable(row.subjectID)
+            SubjectBadge(subjectID: row.subjectID, size: 40)
+                .opacity(row.hidden ? 0.4 : 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .bold))
+                    .foregroundStyle(TonightColor.ink)
                     .opacity(row.hidden ? 0.4 : 1)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .bold))
-                        .foregroundStyle(TonightColor.ink)
-                        .opacity(row.hidden ? 0.4 : 1)
-                        .environment(\.layoutDirection, record?.dir == .rtl ? .rightToLeft : .leftToRight)
-                        .accessibilityLanguage(record?.lang ?? "en")
-                    Text(subtitle(row, record: record))
-                        .font(TonightFont.parent(CGFloat(TonightType.Text.pXs)))
-                        .foregroundStyle(TonightColor.pInkSoft)
-                }
-                Spacer(minLength: 0)
+                    .environment(\.layoutDirection, record?.dir == .rtl ? .rightToLeft : .leftToRight)
+                    .accessibilityLanguage(record?.lang ?? "en")
+                Text(subtitle(row, record: record))
+                    .font(TonightFont.parent(CGFloat(TonightType.Text.pXs)))
+                    .foregroundStyle(TonightColor.pInkSoft)
             }
-            HStack(spacing: 8) {
-                rowAction("Move up", "arrow.up", "subject.up.\(row.subjectID)", "Move \(record?.nameEn ?? row.subjectID) up") {
-                    editor.move(row.subjectID, by: -1)
-                }
-                rowAction("Move down", "arrow.down", "subject.down.\(row.subjectID)", "Move \(record?.nameEn ?? row.subjectID) down") {
-                    editor.move(row.subjectID, by: 1)
-                }
-                rowAction("Rename", "pencil", "subject.rename.\(row.subjectID)", "Rename \(record?.nameEn ?? row.subjectID)") {
-                    editor.beginRename(row.subjectID)
-                }
-                rowAction(row.hidden ? "Show" : "Hide", row.hidden ? "eye.slash" : "eye", "subject.hide.\(row.subjectID)", "Show \(record?.nameEn ?? row.subjectID) to child: \(row.hidden ? "off" : "on")") {
-                    editor.toggleHidden(row.subjectID)
-                }
+            Spacer(minLength: 0)
+            rowAction("Rename", "pencil", "subject.rename.\(row.subjectID)", "Rename \(name)") {
+                editor.beginRename(row.subjectID)
+            }
+            rowAction(row.hidden ? "Show" : "Hide", row.hidden ? "eye.slash" : "eye", "subject.hide.\(row.subjectID)", "Show \(name) to child: \(row.hidden ? "off" : "on")") {
+                editor.toggleHidden(row.subjectID)
             }
         }
         .frame(minHeight: 60)
         .accessibilityIdentifier("subject.row.\(row.subjectID)")
+        .accessibilityAction(named: "Move up") {
+            editor.move(row.subjectID, by: -1)
+        }
+        .accessibilityAction(named: "Move down") {
+            editor.move(row.subjectID, by: 1)
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard let source = items.first else { return false }
+            return editor.move(source, onto: row.subjectID)
+        }
     }
 
     private func rowAction(_ title: String, _ symbol: String, _ identifier: String, _ label: String, action: @MainActor @escaping () -> Void) -> some View {

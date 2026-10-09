@@ -241,6 +241,22 @@ final class SubjectsEditor {
         notice = ""
     }
 
+    /// Drag-handle drop. Swaps two rows and never removes a subject, including the last visible one.
+    @discardableResult
+    func move(_ subjectID: String, onto targetID: String) -> Bool {
+        guard subjectID != targetID else { return false }
+        var ids = ordered.map(\.subjectID)
+        guard let from = ids.firstIndex(of: subjectID), let to = ids.firstIndex(of: targetID) else { return false }
+        let visible = child.subjects.filter { !$0.hidden }.map(\.subjectID)
+        guard !visible.isEmpty, visible.allSatisfy({ ids.contains($0) }) else { return false }
+        ids.swapAt(from, to)
+        child.reorderSubjects(ids)
+        let stillVisible = child.subjects.filter { !$0.hidden }.map(\.subjectID)
+        guard Set(stillVisible) == Set(visible) else { return false }
+        notice = ""
+        return true
+    }
+
     func toggleOptional(_ subjectID: String) {
         if child.subjects.contains(where: { $0.subjectID == subjectID }) {
             let visible = child.subjects.filter { !$0.hidden }
