@@ -63,7 +63,7 @@ final class TonightUITests: XCTestCase {
         app.buttons["child.lock"].tap()
         XCTAssertTrue(app.staticTexts["47 × 36"].waitForExistence(timeout: 5))
         tapDigits(["1", "6", "9", "2"], in: app)
-        XCTAssertTrue(app.staticTexts["Parent area"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Tonight for Aarav"].waitForExistence(timeout: 5))
     }
 
     func testWrongGateAnswerStaysWithTheChild() {
@@ -72,8 +72,42 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["47 × 36"].waitForExistence(timeout: 5))
         tapDigits(["1", "1", "1", "1"], in: app)
         XCTAssertTrue(app.staticTexts["Let's try a different one."].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Parent area"].exists)
+        XCTAssertFalse(app.staticTexts["Tonight for Aarav"].exists)
         XCTAssertTrue(app.staticTexts["47 × 36"].exists)
+    }
+
+    func testEnglishReadAloudCannotSaveWithoutConfirmedText() {
+        let app = launch(screen: "newTask")
+        app.buttons["task.subject.english"].tap()
+        app.buttons["task.next"].tap()
+        XCTAssertTrue(app.buttons["task.typeInstead"].waitForExistence(timeout: 5))
+        app.buttons["task.typeInstead"].tap()
+        let looks = app.buttons["task.looksRight"]
+        XCTAssertTrue(looks.waitForExistence(timeout: 5))
+        XCTAssertFalse(looks.isEnabled)
+        let field = app.descendants(matching: .any)["task.manual"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Ravi has a red kite")
+        XCTAssertTrue(looks.isEnabled)
+    }
+
+    func testNotebookTaskNeedsAPhotoBeforeSave() {
+        let app = launch(screen: "newTask")
+        app.buttons["task.subject.maths"].tap()
+        XCTAssertTrue(app.staticTexts["Tonight can only mark English reading for now. You'll check Maths yourself; it takes about a minute."].waitForExistence(timeout: 5))
+        app.buttons["task.next"].tap()
+        XCTAssertTrue(app.buttons["task.skipPhoto"].waitForExistence(timeout: 5))
+        app.buttons["task.skipPhoto"].tap()
+        let save = app.buttons["task.saveLater"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertFalse(app.buttons["task.saveHand"].isEnabled)
+        app.buttons["task.back"].tap()
+        app.buttons["task.fromPhotos"].tap()
+        app.buttons["task.next"].tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.isEnabled)
     }
 
     private func launch(screen: String? = nil) -> XCUIApplication {

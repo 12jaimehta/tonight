@@ -1,5 +1,4 @@
 import DesignSystem
-import PaywallKit
 import SwiftUI
 
 struct RootView: View {
@@ -34,8 +33,52 @@ struct RootView: View {
                         onCloseGate: model.closeGate
                     )
                 }
-            case .parentArea:
-                ParentAreaView()
+            case .today:
+                TodayScreen(
+                    today: model.today,
+                    gate: model.gate,
+                    onHandPhone: { model.route = .childHome },
+                    onNewTask: model.startNewTask,
+                    onSettings: model.openGate,
+                    onOpenTask: { model.today.selectedTaskID = $0 },
+                    onRetry: { model.today.phase = .ready },
+                    onKey: model.pressGate,
+                    onCloseGate: model.closeGate
+                )
+            case .newTask:
+                if let child = model.child {
+                    NewTaskScreen(child: child, draft: model.draft, onClose: model.closeDraft, onNext: model.nextFromActivity)
+                }
+            case .addPage:
+                if let child = model.child {
+                    AddPageScreen(
+                        child: child,
+                        draft: model.draft,
+                        onBack: model.backFromPage,
+                        onNext: model.nextFromPage,
+                        onTypeInstead: model.typeInstead
+                    )
+                }
+            case .checkWords:
+                if let child = model.child {
+                    CheckWordsScreen(
+                        child: child,
+                        draft: model.draft,
+                        onBack: model.backFromWords,
+                        onConfirm: model.confirmWords,
+                        onMakeNotebook: model.makeNotebook
+                    )
+                }
+            case .review:
+                if let child = model.child {
+                    ReviewSaveScreen(
+                        child: child,
+                        draft: model.draft,
+                        onBack: model.backFromReview,
+                        onSaveLater: { model.saveDraft(handOff: false) },
+                        onSaveHand: { model.saveDraft(handOff: true) }
+                    )
+                }
             }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -45,19 +88,3 @@ struct RootView: View {
     }
 }
 
-struct ParentAreaView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Parent area")
-                .font(TonightFont.child(CGFloat(TonightType.Text.pHero)))
-                .foregroundStyle(TonightColor.ink)
-                .accessibilityIdentifier("parent.area")
-            Text("A grown-up unlocked Tonight.")
-            Text(TonightComposition.speechFlags.sarvamEnabled ? "Server speech is on." : "Server speech is off.")
-            Text(PaywallAccess.canPresent(flag: PaywallFlags(), parentUnlocked: true) ? "Purchases are on." : "Purchases are off.")
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(ParentRoomBackground())
-    }
-}

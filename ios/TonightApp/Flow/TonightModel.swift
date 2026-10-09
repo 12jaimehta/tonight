@@ -2,6 +2,7 @@ import AuthKit
 import Foundation
 import Observation
 import ProfilesKit
+import TaskKit
 
 enum TonightRoute: Equatable {
     case signIn
@@ -9,7 +10,11 @@ enum TonightRoute: Equatable {
     case addChild
     case subjects
     case childHome
-    case parentArea
+    case today
+    case newTask
+    case addPage
+    case checkWords
+    case review
 
     init?(argument: String) {
         switch argument {
@@ -18,7 +23,8 @@ enum TonightRoute: Equatable {
         case "addChild": self = .addChild
         case "subjects": self = .subjects
         case "child": self = .childHome
-        case "parent": self = .parentArea
+        case "today", "parent": self = .today
+        case "newTask": self = .newTask
         default: return nil
         }
     }
@@ -367,6 +373,8 @@ final class TonightModel {
     var addChild = AddChildModel()
     var child: ChildProfile?
     var editor: SubjectsEditor?
+    var today = TodayModel()
+    var draft = NewTaskModel()
     var gate: GateModel
     var authMethod = "email"
     let consentStore = InMemoryAdultConsentStore()
@@ -387,9 +395,42 @@ final class TonightModel {
             signIn.phase = .offline
         }
         switch route {
-        case .subjects, .childHome, .parentArea:
+        case .subjects, .childHome:
             installFixtureChild()
-        case .signIn, .consent, .addChild:
+        case .today:
+            installFixtureChild()
+            if let child {
+                today.loadSample(for: child)
+            }
+            applyTodayPhase(arguments)
+        case .newTask:
+            installFixtureChild()
+            ensureToday()
+            if arguments.contains("-TonightCameraDenied") {
+                draft.cameraDenied = true
+            }
+            if arguments.contains("-TonightNoEnglish") {
+                draft.noEnglish = true
+            }
+        case .signIn, .consent, .addChild, .addPage, .checkWords, .review:
+            break
+        }
+    }
+
+    private func applyTodayPhase(_ arguments: [String]) {
+        guard let index = arguments.firstIndex(of: "-TonightToday"),
+              arguments.indices.contains(arguments.index(after: index)) else { return }
+        switch arguments[arguments.index(after: index)] {
+        case "empty":
+            today.tasks = []
+            today.statuses = [:]
+            today.weekCount = 0
+            today.phase = .empty
+        case "loading":
+            today.phase = .loading
+        case "error":
+            today.phase = .failed
+        default:
             break
         }
     }
@@ -456,7 +497,83 @@ final class TonightModel {
         if let editor {
             child = editor.child
         }
-        route = .childHome
+        ensureToday()
+        route = .today
+    }
+
+    func ensureToday() {
+        guard let child else { return }
+        if today.children.contains(where: { $0.id == child.id }) == false {
+            today.children.append(child)
+        } else if let index = today.children.firstIndex(where: { $0.id == child.id }) {
+            today.children[index] = child
+        }
+        if today.selectedID == nil {
+            today.selectedID = child.id
+        }
+    }
+
+    func startNewTask() {
+        draft = NewTaskModel()
+        route = .newTask
+    }
+
+    func closeDraft() {
+        draft = NewTaskModel()
+        route = .today
+    }
+
+    func nextFromActivity() {
+        guard draft.canLeaveActivity else { return }
+        route = .addPage
+    }
+
+    func nextFromPage() {
+        route = draft.checkMode == .auto ? .checkWords : .review
+    }
+
+    func typeInstead() {
+        draft.manualFallback = true
+        draft.lines = []
+        route = .checkWords
+    }
+
+    func confirmWords() {
+        guard draft.canConfirmWords else { return }
+        route = .review
+    }
+
+    func makeNotebook() {
+        draft.checkMode = .parent
+        draft.manualFallback = false
+        route = .review
+    }
+
+    func backFromPage() {
+        route = .newTask
+    }
+
+    func backFromWords() {
+        route = .addPage
+    }
+
+    func backFromReview() {
+        route = draft.checkMode == .auto ? .checkWords : .addPage
+    }
+
+    func saveDraft(handOff: Bool) {
+        guard let child = today.selected ?? self.child else { return }
+        guard let task = draft.makeTask(child: child) else { return }
+        draft.saving = true
+        today.tasks.append(task)
+        today.statuses[task.id] = .todo
+        today.phase = .ready
+        if today.children.isEmpty {
+            today.children = [child]
+            today.selectedID = child.id
+        }
+        draft = NewTaskModel()
+        route = handOff ? .childHome : .today
     }
 
     func openGate() {
@@ -476,7 +593,10 @@ final class TonightModel {
         switch verdict {
         case .unlocked:
             gate.presented = false
-            route = .parentArea
+            ensureToday()
+            if route == .childHome {
+                route = .today
+            }
         case .locked:
             gate.presented = false
         case .incorrect:
@@ -485,10 +605,6 @@ final class TonightModel {
     }
 
     func backgrounded() {
-        let wasParent = route == .parentArea
         gate.resetForBackground()
-        if wasParent {
-            route = .childHome
-        }
     }
 }

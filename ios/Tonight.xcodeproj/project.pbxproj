@@ -12,6 +12,9 @@
 		A10000000000000000000053 /* SpeechKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000043 /* SpeechKit */; };
 		A10000000000000000000054 /* PaywallKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000044 /* PaywallKit */; };
 		A10000000000000000000055 /* AuthKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000045 /* AuthKit */; };
+		A10000000000000000000056 /* TaskKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000046 /* TaskKit */; };
+		A10000000000000000000057 /* MarkingKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000047 /* MarkingKit */; };
+		A10000000000000000000058 /* CaptureKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000048 /* CaptureKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +68,9 @@
 				A10000000000000000000053 /* SpeechKit in Frameworks */,
 				A10000000000000000000054 /* PaywallKit in Frameworks */,
 				A10000000000000000000055 /* AuthKit in Frameworks */,
+				A10000000000000000000056 /* TaskKit in Frameworks */,
+				A10000000000000000000057 /* MarkingKit in Frameworks */,
+				A10000000000000000000058 /* CaptureKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,6 +127,9 @@
 				A10000000000000000000043 /* SpeechKit */,
 				A10000000000000000000044 /* PaywallKit */,
 				A10000000000000000000045 /* AuthKit */,
+				A10000000000000000000046 /* TaskKit */,
+				A10000000000000000000047 /* MarkingKit */,
+				A10000000000000000000048 /* CaptureKit */,
 			);
 			productName = Tonight;
 			productReference = A10000000000000000000012 /* Tonight.app */;
@@ -446,6 +455,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
 			productName = AuthKit;
+		};
+		A10000000000000000000046 /* TaskKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = TaskKit;
+		};
+		A10000000000000000000047 /* MarkingKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = MarkingKit;
+		};
+		A10000000000000000000048 /* CaptureKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = CaptureKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
