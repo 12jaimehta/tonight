@@ -233,7 +233,8 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertTrue(outcome.usedSameBuffer)
         XCTAssertEqual(outcome.bytesSent, 0)
         XCTAssertEqual(onDevice.calls, 1)
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
         XCTAssertEqual(runner.audit.snapshot().last?.cancelledAfterBytes != nil, true)
     }
 
@@ -248,7 +249,8 @@ final class SpeechPolicyTests: XCTestCase {
         )
         XCTAssertTrue(outcome.parentMarking)
         XCTAssertEqual(outcome.engine, .parentMarking)
-        XCTAssertEqual(await transport.posts.count, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
         XCTAssertEqual(onDevice.calls, 0)
     }
 
@@ -256,13 +258,15 @@ final class SpeechPolicyTests: XCTestCase {
         let transport = SpyTransport()
         let runner = makeRunner(transport: transport, sleeper: NeverSleeper())
         await runner.suspend()
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
         let outcome = await runner.run(
             audio: SpeechAudio(samples: Data([1, 2])),
             input: input(flagOn: false, record: record(scopes: [.onDevice])),
             attemptID: UUID()
         )
-        XCTAssertEqual(await transport.posts.count, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
         XCTAssertEqual(outcome.bytesSent, 0)
     }
 
