@@ -2,7 +2,7 @@ import DesignSystem
 import ProfilesKit
 import SwiftUI
 
-/// M1-05. Two-digit multiplication from `ParentalGateBank`. Not a PIN and not stored.
+/// M1-05. A 3-digit number in words. Not a PIN, not stored, and not timed.
 struct ParentalGateSheet: View {
     @Bindable var gate: GateModel
     var childName: String
@@ -34,6 +34,7 @@ struct ParentalGateSheet: View {
                 Text(gate.challenge.prompt)
                     .font(TonightFont.child(CGFloat(TonightType.Text.cTitle)))
                     .frame(maxWidth: .infinity)
+                    .accessibilityLabel(gate.challenge.prompt)
                     .accessibilityIdentifier("gate.prompt")
                 HStack(spacing: 8) {
                     ForEach(0..<GateModel.digitCount, id: \.self) { index in

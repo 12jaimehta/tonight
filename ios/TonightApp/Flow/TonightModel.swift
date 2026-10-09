@@ -292,7 +292,7 @@ final class SubjectsEditor {
 @MainActor
 @Observable
 final class GateModel {
-    static let digitCount = 4
+    static let digitCount = ParentalGateBank.digitCount
 
     var session = ParentalGateSession()
     var answer = ""
@@ -313,7 +313,6 @@ final class GateModel {
 
     func press(_ key: String) -> GateVerdict? {
         if isLocked {
-            notice = "Locked for a minute."
             return .locked
         }
         if key == "delete" {
@@ -339,7 +338,7 @@ final class GateModel {
             answer = ""
             if !fixed { offset += 1 }
         case .locked:
-            notice = "Locked for a minute."
+            notice = ""
             answer = ""
         }
         return verdict
@@ -362,11 +361,12 @@ final class GateModel {
 
     static func previewLocked() -> GateModel {
         let gate = GateModel(fixed: true)
-        gate.notice = "Locked for a minute."
+        gate.presented = true
+        gate.notice = "Let's try a different one."
         var session = ParentalGateSession()
-        _ = session.submit(answer: "1", to: ParentalGateBank.challenges[0], now: Date())
-        _ = session.submit(answer: "1", to: ParentalGateBank.challenges[0], now: Date())
-        _ = session.submit(answer: "1", to: ParentalGateBank.challenges[0], now: Date())
+        let challenge = ParentalGateBank.challenge(fixed: true)
+        _ = session.submit(answer: "1", to: challenge, now: Date())
+        _ = session.submit(answer: "1", to: challenge, now: Date())
         gate.session = session
         return gate
     }
@@ -594,10 +594,11 @@ final class TonightModel {
 
     func openGate(for purpose: GatePurpose) {
         gatePurpose = purpose
-        gate.presented = true
         if gate.isLocked {
-            gate.notice = "Locked for a minute."
+            gate.presented = false
+            return
         }
+        gate.presented = true
     }
 
     func closeGate() {

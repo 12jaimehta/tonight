@@ -4,7 +4,7 @@ Native app for classes 1–3 (ages 6–8). This tree is the M0 foundation: Swift
 
 The app target is iOS 17 or newer, iPhone, portrait only. Bundle id `com.tonight.homework`. The speech path that uses `SpeechAnalyzer` needs the iOS 26 SDK (Xcode 26). There are no third-party packages.
 
-`Tonight.xcworkspace` opens the app project. The app links the local package at `Packages/Tonight`. Launch argument `-TonightFixedGate` uses the first parental-gate challenge (`47 × 36`). The server-speech flag is the compile-time default in `SpeechFeatureFlags`. It is not stored in UserDefaults.
+`Tonight.xcworkspace` opens the app project. The app links the local package at `Packages/Tonight`. Launch argument `-TonightFixedGate` uses the spelled-out challenge "three hundred and forty-seven" (347). The server-speech flag is the compile-time default in `SpeechFeatureFlags`. It is not stored in UserDefaults.
 
 ## Modules
 

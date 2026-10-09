@@ -56,7 +56,7 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(order.label.contains("evs"))
     }
 
-    func testFixedGateUnlocksWithTheFirstProduct() {
+    func testFixedGateUnlocksWithTheSpelledNumber() {
         let app = launch(screen: "child")
         XCTAssertTrue(app.buttons["subject.english"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["subject.english"].label.contains("English"))
@@ -64,19 +64,19 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(app.buttons["subject.maths"].label.contains("Maths"))
         XCTAssertTrue(app.buttons["subject.evs"].label.contains("EVS"))
         app.buttons["child.lock"].tap()
-        XCTAssertTrue(app.staticTexts["47 × 36"].waitForExistence(timeout: 5))
-        tapDigits(["1", "6", "9", "2"], in: app)
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
         XCTAssertTrue(app.staticTexts["Tonight for Aarav"].waitForExistence(timeout: 5))
     }
 
     func testWrongGateAnswerStaysWithTheChild() {
         let app = launch(screen: "child")
         app.buttons["child.lock"].tap()
-        XCTAssertTrue(app.staticTexts["47 × 36"].waitForExistence(timeout: 5))
-        tapDigits(["1", "1", "1", "1"], in: app)
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["1", "1", "1"], in: app)
         XCTAssertTrue(app.staticTexts["Let's try a different one."].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Tonight for Aarav"].exists)
-        XCTAssertTrue(app.staticTexts["47 × 36"].exists)
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].exists)
     }
 
     func testEnglishReadAloudCannotSaveWithoutConfirmedText() {
