@@ -340,7 +340,6 @@
 		A10000000000000000000067 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -359,7 +358,6 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tonight.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tonight";
 				TEST_TARGET_NAME = Tonight;
 			};
 			name = Debug;
@@ -367,7 +365,6 @@
 		A10000000000000000000068 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -386,7 +383,6 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tonight.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tonight";
 				TEST_TARGET_NAME = Tonight;
 			};
 			name = Release;
