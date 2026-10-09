@@ -116,6 +116,8 @@ struct SubjectsScreen: View {
                     .font(TonightFont.parent(CGFloat(TonightType.Text.pXs)))
                     .foregroundStyle(TonightColor.pInkSoft)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("subject.row.\(row.subjectID)")
             Spacer(minLength: 0)
             rowAction("Rename", "pencil", "subject.rename.\(row.subjectID)", "Rename \(name)") {
                 editor.beginRename(row.subjectID)
@@ -125,7 +127,6 @@ struct SubjectsScreen: View {
             }
         }
         .frame(minHeight: 60)
-        .accessibilityIdentifier("subject.row.\(row.subjectID)")
         .accessibilityAction(named: "Move up") {
             editor.move(row.subjectID, by: -1)
         }
