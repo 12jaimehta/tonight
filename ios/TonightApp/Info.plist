@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tonight uses the microphone so a child can read the page aloud on this iPhone.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Tonight turns that reading into text on this iPhone.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Tonight uses the camera so a parent can photograph a homework page. Photos stay in the app and are not saved to the camera roll.</string>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>

@@ -18,7 +18,7 @@ A private Storage bucket for study audio, with a 90-day deletion job.
 
 ## Sarvam proxy
 
-Edge Function at `/functions/v1/sarvam-speech`. The Sarvam key stays in the function, not in the app.
+Edge Function at `/functions/v1/sarvam-proxy`. The Sarvam key stays in the function, not in the app. The request and response the iOS client already assumes are in `sarvam-proxy.contract.json`.
 
 ## Week-1 checks
 

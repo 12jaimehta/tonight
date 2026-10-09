@@ -53,7 +53,10 @@ let package = Package(
             name: "Persistence",
             dependencies: ["ProfilesKit", "TaskKit", "PracticeKit", "AuthKit"]
         ),
-        .testTarget(name: "PersistenceTests", dependencies: ["Persistence"]),
+        .testTarget(
+            name: "PersistenceTests",
+            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit"]
+        ),
 
         .target(name: "Telemetry"),
         .testTarget(name: "TelemetryTests", dependencies: ["Telemetry"]),

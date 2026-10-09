@@ -51,8 +51,8 @@ public struct HomeworkDraft: Equatable, Sendable {
 
 public enum HomeworkRules {
     public static let autoSubjectID = "english"
-    /// Placeholder star scale until Tonight Design publishes the reward.
-    public static let starScale = 0...3
+    /// Notebook stars the parent can award. Zero is not a reward.
+    public static let starScale = StarScale.valid
 
     public static func issues(for draft: HomeworkDraft) -> [HomeworkIssue] {
         var issues: [HomeworkIssue] = []
@@ -77,6 +77,7 @@ public enum HomeworkRules {
 public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
     public var id: UUID
     public var childID: UUID
+    /// Exactly one subject. A task does not store a list of subjects.
     public var subjectID: String
     public var schoolClass: String
     public var instruction: String
@@ -87,6 +88,11 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
     public var showMarkOverride: Bool?
     public var stars: Int?
     public var createdAt: Date
+
+    /// v1 flow for this one subject. English is read-aloud. Anything else is a notebook photo.
+    public var activityKind: String {
+        checkMode == .auto ? V1ActivityKind.readAloud : V1ActivityKind.notebook
+    }
 
     public init(
         id: UUID,
@@ -155,11 +161,11 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
 }
 
 public struct StarReward: Codable, Hashable, Sendable {
-    public static let scale = 0...3
+    public static let scale = StarScale.valid
     public var count: Int
 
     public init?(count: Int) {
-        guard Self.scale.contains(count) else { return nil }
+        guard let count = NotebookStars.count(picked: count) else { return nil }
         self.count = count
     }
 }

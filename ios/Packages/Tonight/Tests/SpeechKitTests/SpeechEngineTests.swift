@@ -100,7 +100,7 @@ final class SpeechEngineTests: XCTestCase {
         XCTAssertNoThrow(try TonightEndpoints.validate(TonightEndpoints.proxyBaseURL))
         let speech = try SarvamProxyConfiguration().speechURL()
         XCTAssertEqual(speech.host, "project-ref.supabase.co")
-        XCTAssertEqual(speech.path, "/functions/v1/sarvam-speech")
+        XCTAssertEqual(speech.path, "/functions/v1/sarvam-proxy")
         XCTAssertEqual(OnDeviceRequestPolicy.requiresOnDeviceRecognition, true)
         XCTAssertEqual(OnDeviceRequestPolicy.localeIdentifier, "en-IN")
         XCTAssertEqual(OnDeviceRequestPolicy.serverTimeout, 8)
