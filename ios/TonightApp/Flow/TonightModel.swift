@@ -392,7 +392,7 @@ final class TonightModel {
     let consentStore = InMemoryAdultConsentStore()
     let sessionStore: any ParentSessionStoring
 
-    init(sessionStore: any ParentSessionStoring = InMemorySessionStore()) {
+    init(sessionStore: any ParentSessionStoring = KeychainSessionStore()) {
         self.sessionStore = sessionStore
         let arguments = ProcessInfo.processInfo.arguments
         gate = GateModel(fixed: arguments.contains("-TonightFixedGate"))

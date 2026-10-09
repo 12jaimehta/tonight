@@ -3,7 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var model = TonightModel()
+    @State private var model = TonightComposition.makeModel()
 
     var body: some View {
         Group {
