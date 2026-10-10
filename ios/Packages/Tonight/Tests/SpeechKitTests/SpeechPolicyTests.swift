@@ -5,6 +5,11 @@ final class SpeechPolicyTests: XCTestCase {
     private let child = UUID()
     private let otherChild = UUID()
 
+    override func setUp() {
+        super.setUp()
+        installPlaceholderSpeechConfig()
+    }
+
     func testCG01_noConsent_doesNotRecord() {
         let selection = SpeechEngineSelector.select(input(record: nil))
         XCTAssertEqual(selection.engine, .none)
@@ -163,8 +168,23 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(urls.count, 1)
-        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
+        XCTAssertEqual(urls, [], "NET-02c the host lives in xcconfig, not in a source literal")
+    }
+
+    func test_NET02c_redirectDelegateRejectsEveryHop() {
+        installPlaceholderSpeechConfig()
+        let delegate = AllowlistSessionDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: TonightEndpoints.proxyBaseURL)
+        let response = HTTPURLResponse(url: TonightEndpoints.proxyBaseURL, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        let offHost = URLRequest(url: URL(string: "https://api.sarvam.ai/speech")!)
+        var followed: URLRequest? = URLRequest(url: TonightEndpoints.proxyBaseURL)
+        delegate.urlSession(session, task: task, willPerformHTTPRedirection: response, newRequest: offHost) { request in
+            followed = request
+        }
+        XCTAssertNil(followed)
+        task.cancel()
+        session.invalidateAndCancel()
     }
 
     func testForegroundSessionIsNotABackgroundSession() {
@@ -367,6 +387,13 @@ actor SpyTransport: ProxyTransporting {
 
 struct ImmediateSleeper: SpeechSleeper {
     func sleep(seconds: TimeInterval) async throws {}
+}
+
+func installPlaceholderSpeechConfig() {
+    TonightEndpoints.use(SupabaseSpeechConfig(
+        baseURL: URL(string: "https://project-ref.supabase.co")!,
+        anonKey: "test-anon-key"
+    ))
 }
 
 struct NeverSleeper: SpeechSleeper {

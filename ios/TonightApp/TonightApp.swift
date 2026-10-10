@@ -3,6 +3,10 @@ import SpeechKit
 
 @main
 struct TonightApp: App {
+    init() {
+        TonightEndpoints.use(bundle: .main)
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

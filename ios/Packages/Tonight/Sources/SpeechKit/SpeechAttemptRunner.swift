@@ -410,7 +410,7 @@ public final class CallLogStore: @unchecked Sendable {
 
 /// Foreground session only. Background configurations resume uploads after the app is killed (CG-30).
 public enum ProxySessionFactory {
-    public static func foreground(timeout: TimeInterval = OnDeviceRequestPolicy.serverTimeout) -> URLSession {
+    public static func foregroundConfiguration(timeout: TimeInterval = OnDeviceRequestPolicy.serverTimeout) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
@@ -418,7 +418,12 @@ public enum ProxySessionFactory {
         configuration.sessionSendsLaunchEvents = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
-        return URLSession(configuration: configuration)
+        return configuration
+    }
+
+    public static func foreground(timeout: TimeInterval = OnDeviceRequestPolicy.serverTimeout) -> URLSession {
+        let delegate = AllowlistSessionDelegate()
+        return URLSession(configuration: foregroundConfiguration(timeout: timeout), delegate: delegate, delegateQueue: nil)
     }
 
     public static func isBackground(_ configuration: URLSessionConfiguration) -> Bool {
@@ -426,13 +431,46 @@ public enum ProxySessionFactory {
     }
 }
 
+/// Refuses every redirect hop. URLSession would otherwise follow a 3xx to any host.
+public final class AllowlistSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        if let url = request.url {
+            do {
+                try TonightEndpoints.validate(url)
+            } catch {
+                completionHandler(nil)
+                return
+            }
+        }
+        completionHandler(nil)
+    }
+}
+
 public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Sendable {
     private let session: URLSession
     private let lock = OSAllocatedUnfairLock()
     private var task: URLSessionTask?
+    private let redirectDelegate: AllowlistSessionDelegate?
 
-    public init(session: URLSession = ProxySessionFactory.foreground()) {
-        self.session = session
+    public init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+            self.redirectDelegate = nil
+        } else {
+            let delegate = AllowlistSessionDelegate()
+            self.redirectDelegate = delegate
+            self.session = URLSession(
+                configuration: ProxySessionFactory.foregroundConfiguration(),
+                delegate: delegate,
+                delegateQueue: nil
+            )
+        }
     }
 
     public func post(_ request: ProxyRequest) async throws -> ProxyResponse {
