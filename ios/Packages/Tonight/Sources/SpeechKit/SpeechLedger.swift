@@ -224,6 +224,7 @@ public final class SpeechLedger: @unchecked Sendable {
             try FileManager.default.removeItem(at: url)
             deletedAudio += bytes
         }
+        let bytesDeleted = deletedAudio
         return try lock.withLock { file in
             let removed = file.artefacts.filter { $0.childProfileID == childProfileID && $0.serverPath }
             file.artefacts.removeAll { $0.childProfileID == childProfileID && $0.serverPath }
@@ -244,7 +245,7 @@ public final class SpeechLedger: @unchecked Sendable {
             }
             try save(file)
             return WithdrawalEffect(
-                deletedAudioBytes: deletedAudio,
+                deletedAudioBytes: bytesDeleted,
                 deletedTranscripts: removed.filter { $0.kind == .transcript }.count,
                 deletedAlignments: removed.filter { $0.kind == .alignment }.count,
                 deletedMarks: 0,
