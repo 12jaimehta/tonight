@@ -153,8 +153,38 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled)
     }
 
-    func test_CG32_withdrawConsentConfirmsBehindTheGate() {
+    func test_N23_emptyStateWhenThereIsNoConsent() {
         let app = launch(screen: "child")
+        app.buttons["child.lock"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
+        app.buttons["today.settings"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
+        XCTAssertTrue(app.staticTexts["No consent on file"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["consent.withdraw"].exists)
+    }
+
+    func test_N23_seededConsentWithdrawsWithoutAPlaceholderGrant() throws {
+        let app = launch(screen: "child", extra: ["-TonightSeedConsent"])
+        app.buttons["child.lock"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
+        app.buttons["today.settings"].tap()
+        tapDigits(["3", "4", "7"], in: app)
+        XCTAssertTrue(app.buttons["consent.withdraw"].waitForExistence(timeout: 5))
+        let model = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("TonightApp/Flow/TonightModel.swift")
+        let source = try String(contentsOf: model, encoding: .utf8)
+        let withdraw = source.components(separatedBy: "func confirmWithdrawal").last ?? ""
+        XCTAssertFalse(withdraw.contains("parent-placeholder"))
+        XCTAssertFalse(withdraw.contains("consentCenter.grant"))
+    }
+
+    func test_CG32_withdrawConsentConfirmsBehindTheGate() {
+        let app = launch(screen: "child", extra: ["-TonightSeedConsent"])
         app.buttons["child.lock"].tap()
         XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
         tapDigits(["3", "4", "7"], in: app)
@@ -184,9 +214,9 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Suspended"].waitForExistence(timeout: 8))
     }
 
-    private func launch(screen: String? = nil) -> XCUIApplication {
+    private func launch(screen: String? = nil, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        var arguments = ["-TonightFixedGate"]
+        var arguments = ["-TonightFixedGate"] + extra
         if let screen {
             arguments += ["-TonightScreen", screen]
         }

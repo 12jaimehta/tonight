@@ -5,6 +5,7 @@ import SwiftUI
 struct WithdrawConsentSheet: View {
     var confirming: Bool
     var notice: String
+    var hasConsent: Bool = true
     var onAsk: @MainActor () -> Void
     var onConfirm: @MainActor () -> Void
     var onCancel: @MainActor () -> Void
@@ -19,17 +20,22 @@ struct WithdrawConsentSheet: View {
                 Text("This clears the consent record for this child and queues deletion of their data.")
                     .font(TonightFont.parent(CGFloat(TonightType.Text.pBase)))
                     .foregroundStyle(TonightColor.pInkSoft)
-                if !notice.isEmpty {
+                if !hasConsent {
+                    Text(notice.isEmpty ? "No consent on file" : notice)
+                        .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .semibold))
+                        .foregroundStyle(TonightColor.ink)
+                        .accessibilityIdentifier("consent.withdraw.empty")
+                } else if !notice.isEmpty {
                     Text(notice)
                         .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .semibold))
                         .foregroundStyle(TonightColor.ink)
                         .accessibilityIdentifier("consent.withdrawn")
                 }
-                if confirming {
+                if hasConsent && confirming {
                     Button("Yes, withdraw", action: onConfirm)
                         .buttonStyle(ParentWideButtonStyle(fill: TonightColor.pError, foreground: TonightColor.white))
                         .accessibilityIdentifier("consent.withdraw.confirm")
-                } else if notice.isEmpty {
+                } else if hasConsent && notice.isEmpty {
                     Button("Withdraw consent", action: onAsk)
                         .buttonStyle(ParentWideButtonStyle(fill: TonightColor.pAccent, foreground: TonightColor.pAccentInk))
                         .accessibilityIdentifier("consent.withdraw")

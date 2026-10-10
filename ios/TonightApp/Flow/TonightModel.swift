@@ -424,6 +424,7 @@ final class TonightModel {
     var showingWithdrawal = false
     var confirmingWithdrawal = false
     var withdrawalNotice = ""
+    var withdrawalHasConsent = false
     var withdrawalEpoch = 0
     let consentStore = InMemoryAdultConsentStore()
     let consentCenter: ConsentCenter?
@@ -477,6 +478,22 @@ final class TonightModel {
         case .signIn, .consent, .addChild, .addPage, .checkWords, .review, .readAloud, .childResult, .notebook, .parentChecksChild, .parentResult, .parentCheck, .praise:
             break
         }
+        if arguments.contains("-TonightSeedConsent") {
+            seedLocalConsent()
+        }
+    }
+
+    private func seedLocalConsent() {
+        guard let child, let consentCenter else { return }
+        let parentID = (try? sessionStore.load())?.parentID ?? "parent"
+        try? consentCenter.grant(AudioConsentRecord(
+            parentID: parentID,
+            childProfileID: child.id,
+            scopes: [.onDevice],
+            tappedAt: Date(),
+            method: "screen",
+            backendConfirmed: true
+        ))
     }
 
     private func applyTodayPhase(_ arguments: [String]) {
@@ -679,6 +696,8 @@ final class TonightModel {
                 route = .today
                 confirmingWithdrawal = false
                 withdrawalNotice = ""
+                let childID = child?.id ?? today.selected?.id
+                withdrawalHasConsent = childID.flatMap { consentCenter?.record(for: $0) } != nil
                 showingWithdrawal = true
             case .parentCheck:
                 route = .parentCheck
@@ -717,19 +736,14 @@ final class TonightModel {
             withdrawalNotice = "Consent store is not configured."
             return
         }
-        _ = try? emailOTP?.tokens.load()
         do {
-            if consentCenter.record(for: childID) == nil {
-                try consentCenter.grant(AudioConsentRecord(
-                    parentID: "parent-placeholder",
-                    childProfileID: childID,
-                    scopes: [.onDevice],
-                    tappedAt: Date(),
-                    method: "screen",
-                    backendConfirmed: false
-                ))
+            let existing = consentCenter.record(for: childID)
+            guard existing != nil else {
+                withdrawalHasConsent = false
+                withdrawalNotice = "No consent on file"
+                return
             }
-            let consentID = consentCenter.record(for: childID)?.id
+            let consentID = existing?.id
             _ = try await consentCenter.withdraw(childProfileID: childID, at: Date())
             await serverWithdrawal?.submit(childID: childID, consentRecordID: consentID)
             withdrawalNotice = "Consent withdrawn"

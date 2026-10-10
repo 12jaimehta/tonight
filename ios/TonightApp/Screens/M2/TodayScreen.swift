@@ -17,6 +17,7 @@ struct TodayScreen: View {
     var showingWithdrawal: Bool = false
     var confirmingWithdrawal: Bool = false
     var withdrawalNotice: String = ""
+    var withdrawalHasConsent: Bool = true
     var onAskWithdrawal: @MainActor () -> Void = {}
     var onConfirmWithdrawal: @MainActor () -> Void = {}
     var onCancelWithdrawal: @MainActor () -> Void = {}
@@ -63,6 +64,7 @@ struct TodayScreen: View {
                 WithdrawConsentSheet(
                     confirming: confirmingWithdrawal,
                     notice: withdrawalNotice,
+                    hasConsent: withdrawalHasConsent,
                     onAsk: onAskWithdrawal,
                     onConfirm: onConfirmWithdrawal,
                     onCancel: onCancelWithdrawal

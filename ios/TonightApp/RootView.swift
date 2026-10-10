@@ -72,6 +72,7 @@ struct RootView: View {
                     showingWithdrawal: model.showingWithdrawal,
                     confirmingWithdrawal: model.confirmingWithdrawal,
                     withdrawalNotice: model.withdrawalNotice,
+                    withdrawalHasConsent: model.withdrawalHasConsent,
                     onAskWithdrawal: model.askWithdrawal,
                     onConfirmWithdrawal: { Task { @MainActor in await model.confirmWithdrawal() } },
                     onCancelWithdrawal: model.cancelWithdrawal
