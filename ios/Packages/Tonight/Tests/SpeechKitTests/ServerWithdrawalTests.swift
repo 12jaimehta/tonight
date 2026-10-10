@@ -69,15 +69,18 @@ final class ServerWithdrawalTests: XCTestCase {
         let parent = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
         let childID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
         let consentID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
-        XCTAssertEqual(await client.createParent(id: parent), .synced)
-        XCTAssertEqual(await client.createChild(id: childID, parentID: parent, nickname: "Aarav", schoolClass: "1"), .synced)
-        XCTAssertEqual(await client.createConsent(id: consentID, parentID: parent, childID: childID), .synced)
+        let parentResult = await client.createParent(id: parent)
+        let childResult = await client.createChild(id: childID, parentID: parent, nickname: "Aarav", schoolClass: "1")
+        let consentResult = await client.createConsent(id: consentID, parentID: parent, childID: childID)
+        XCTAssertEqual(parentResult, .synced)
+        XCTAssertEqual(childResult, .synced)
+        XCTAssertEqual(consentResult, .synced)
         let calls = await transport.calls
         XCTAssertEqual(calls.map(\.method), ["POST", "POST", "POST"])
         XCTAssertEqual(calls.map(\.path), ["/rest/v1/parent", "/rest/v1/child_profile", "/rest/v1/consent_record"])
         XCTAssertEqual(calls[0].body?["id"], parent.uuidString.lowercased())
         XCTAssertEqual(calls[1].body?["parent_id"], parent.uuidString.lowercased())
-        XCTAssertEqual(calls[2].json?["scopes"] as? [String], ["on_device_speech"])
+        XCTAssertEqual(calls[2].scopes, ["on_device_speech"])
         XCTAssertTrue(calls.allSatisfy { $0.prefer == "return=representation" })
         XCTAssertTrue(calls.allSatisfy { $0.authorization == "Bearer parent-access-token" })
 
@@ -98,7 +101,8 @@ final class ServerWithdrawalTests: XCTestCase {
     func test_N32_refreshThenForegroundFlushSendsTheNewToken() async throws {
         let transport = RecordingTransport()
         await transport.setOffline(true)
-        var token = "expired-token"
+        let token = OSAllocatedUnfairLock(initialState: "expired-token")
+        let when = self.when
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathComponent("queue.json")
@@ -106,14 +110,14 @@ final class ServerWithdrawalTests: XCTestCase {
         let refreshing = ServerWithdrawalClient(
             baseURL: URL(string: "https://project-ref.supabase.co")!,
             anonKey: "anon-test",
-            accessToken: { token },
+            accessToken: { token.withLock { $0 } },
             send: { request in try await transport.send(request) },
             queueFile: file,
-            now: { self.when }
+            now: { when }
         )
         await client.submit(childID: child, consentRecordID: consent)
         await transport.setOffline(false)
-        token = "fresh-token"
+        token.withLock { $0 = "fresh-token" }
         _ = await refreshing.flush()
         let calls = await transport.calls
         XCTAssertEqual(calls.map(\.authorization), ["Bearer fresh-token", "Bearer fresh-token"])
@@ -123,12 +127,14 @@ final class ServerWithdrawalTests: XCTestCase {
         let transport = RecordingTransport()
         await transport.setBody(Data("[]".utf8))
         let none = makeClient(transport: transport, token: "parent-access-token")
-        XCTAssertEqual(await none.submit(childID: child, consentRecordID: consent), .notOneRow(0))
+        let noneResult = await none.submit(childID: child, consentRecordID: consent)
+        XCTAssertEqual(noneResult, .notOneRow(0))
         XCTAssertEqual(none.pending().count, 1)
 
         await transport.setBody(Data("[{},{}]".utf8))
         let many = makeClient(transport: transport, token: "parent-access-token")
-        XCTAssertEqual(await many.submit(childID: child, consentRecordID: consent), .notOneRow(2))
+        let manyResult = await many.submit(childID: child, consentRecordID: consent)
+        XCTAssertEqual(manyResult, .notOneRow(2))
         XCTAssertEqual(many.pending().count, 1)
     }
 
@@ -152,7 +158,7 @@ final class ServerWithdrawalTests: XCTestCase {
     }
 }
 
-private struct CapturedCall: Equatable {
+private struct CapturedCall: Equatable, Sendable {
     var method: String
     var path: String
     var query: String?
@@ -160,13 +166,7 @@ private struct CapturedCall: Equatable {
     var apiKey: String?
     var prefer: String?
     var body: [String: String]?
-    var json: [String: Any]?
-
-    static func == (lhs: CapturedCall, rhs: CapturedCall) -> Bool {
-        lhs.method == rhs.method && lhs.path == rhs.path && lhs.query == rhs.query
-            && lhs.authorization == rhs.authorization && lhs.apiKey == rhs.apiKey
-            && lhs.prefer == rhs.prefer && lhs.body == rhs.body
-    }
+    var scopes: [String]?
 }
 
 private actor RecordingTransport {
@@ -179,7 +179,8 @@ private actor RecordingTransport {
 
     func send(_ request: URLRequest) throws -> ServerHTTPResponse {
         if offline { throw URLError(.notConnectedToInternet) }
-        let object = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) }
+        let object = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+        let scopes = (object?["scopes"] as? [Any])?.compactMap { $0 as? String }
         calls.append(CapturedCall(
             method: request.httpMethod ?? "",
             path: request.url?.path ?? "",
@@ -188,7 +189,7 @@ private actor RecordingTransport {
             apiKey: request.value(forHTTPHeaderField: "api" + "key"),
             prefer: request.value(forHTTPHeaderField: "Prefer"),
             body: object as? [String: String],
-            json: object as? [String: Any]
+            scopes: scopes
         ))
         return ServerHTTPResponse(status: 200, body: body)
     }
