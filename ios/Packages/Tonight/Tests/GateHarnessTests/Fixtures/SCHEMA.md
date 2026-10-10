@@ -1,10 +1,12 @@
 # Gate harness fixture schema
 
-This is the M0 results file from the independent checker README. Rates in a results report are numerator/denominator pairs, not floats. Outcome codes are `APPLE`, `SARVAM`, `NO_GO`, `OUT_OF_COHORT`, `INVALID_STUDY`, and `INVALID_INPUT`.
+This is the M0 results file from the independent checker README. Rates in a results report are numerator/denominator pairs, not floats. Outcome codes are `APPLE`, `SARVAM`, `NO_GO`, `OUT_OF_COHORT`, `INVALID_STUDY`, `UNPAIRED_RECORDING`, and `INVALID_INPUT`.
 
 `schema_version` must be `1`. `children` is a non-empty list. Each child has a non-empty string `child_id`, an integer `age`, an integer `school_class`, and a non-empty `recordings` list. Each recording has a unique `recording_id` and exactly one of `cells` or `words`.
 
 A cell is one pattern of the booleans plus a non-negative integer `n`. `reference_correct` may be `null` for an unjudged word. Duplicate judged patterns in one recording are added together. A word object is one judged or unjudged token. Both engines are judged on the same tokens.
+
+`apple_correct` or `sarvam_correct` may be missing or `null` when that engine has no result. That word is not correct and not incorrect, and it is left out of the counts. A recording that then has no word judged by both engines is `UNPAIRED_RECORDING`. That is an input error. The study is not scored, so the recording does not pass or fail the study by itself.
 
 ```json
 {
@@ -39,6 +41,7 @@ A cell is one pattern of the booleans plus a non-negative integer `n`. `referenc
 | In-range age more than 1 year from school class + 5 | warning only; the study is still scored |
 | Pooled false-accept or false-reject denominator is 0 | `INVALID_STUDY` |
 | Schema mismatch | `INVALID_INPUT` |
+| Recording with no word judged by both engines | `UNPAIRED_RECORDING` |
 
 The child is not dropped and is not scored when the code is `OUT_OF_COHORT`.
 
@@ -82,7 +85,7 @@ A tie on false-accept is not worse. An interval endpoint of exactly 0 stays `APP
 
 `schema_version`, `decision`, `seed`, `warnings`, `agreement_delta` (`numerator`, `denominator`), `apple`, `sarvam`, `clearly_beats`, and `interval` (`method`, `generator`, `confidence`, `resamples`, `seed`, `low`, `high`, `strictly_above_zero`).
 
-Error JSON is `{ "error": "OUT_OF_COHORT" | "INVALID_STUDY" | "INVALID_INPUT", "message": "..." }`.
+Error JSON is `{ "error": "OUT_OF_COHORT" | "INVALID_STUDY" | "UNPAIRED_RECORDING" | "INVALID_INPUT", "message": "..." }`.
 
 Large cohorts are built from cell counts in the test. A missing `*.golden.json` for the seeded names fails the run. Those goldens are not rewritten by the test.
 
@@ -91,3 +94,4 @@ Large cohorts are built from cell counts in the test. A missing `*.golden.json` 
 | `met36.json` | `SARVAM` (only Sarvam passes; denominators are defined) |
 | `met34.json` | `APPLE` (both pass, Sarvam false-accept is worse) |
 | `met13.json` | `OUT_OF_COHORT` |
+| `met28.json` | `UNPAIRED_RECORDING` |

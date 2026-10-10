@@ -2,7 +2,7 @@ import Foundation
 
 /// M0 speech-engine gate. The results file and outcome codes match the
 /// independent checker: `APPLE`, `SARVAM`, `NO_GO`, `OUT_OF_COHORT`,
-/// `INVALID_STUDY`, and `INVALID_INPUT`.
+/// `INVALID_STUDY`, `UNPAIRED_RECORDING`, and `INVALID_INPUT`.
 ///
 /// Expected age is school class + 5, with tolerance ±1. The only in-range
 /// warnings are class 1 with age 8 and class 3 with age 6. A mismatch is a
@@ -190,6 +190,10 @@ public struct GateHarnessError: Error, Equatable, Sendable {
 
     public static func invalidInput(_ message: String) -> GateHarnessError {
         GateHarnessError(code: "INVALID_INPUT", message: message)
+    }
+
+    public static func unpairedRecording(_ message: String) -> GateHarnessError {
+        GateHarnessError(code: "UNPAIRED_RECORDING", message: message)
     }
 }
 
@@ -381,13 +385,16 @@ private func parseRecording(
     if hasCells == hasWords {
         throw GateHarnessError.invalidInput("\(path) must contain exactly one of 'cells' or 'words'")
     }
-    let counts: [JudgedPattern: Int]
+    let parsed: (counts: [JudgedPattern: Int], sawPair: Bool)
     if hasCells {
-        counts = try countsFromCells(body["cells"], path: "\(path).cells")
+        parsed = try countsFromCells(body["cells"], path: "\(path).cells")
     } else {
-        counts = try countsFromWords(body["words"], path: "\(path).words")
+        parsed = try countsFromWords(body["words"], path: "\(path).words")
     }
-    return try totals(recordingID: recordingID, childID: childID, counts: counts, path: path)
+    if !parsed.sawPair {
+        throw GateHarnessError.unpairedRecording("recording \(recordingID) has no matching pair")
+    }
+    return try totals(recordingID: recordingID, childID: childID, counts: parsed.counts, path: path)
 }
 
 private struct JudgedPattern: Hashable {
@@ -396,48 +403,77 @@ private struct JudgedPattern: Hashable {
     var sarvamCorrect: Bool
 }
 
-private func countsFromCells(_ raw: Any?, path: String) throws -> [JudgedPattern: Int] {
+private func countsFromCells(_ raw: Any?, path: String) throws -> (counts: [JudgedPattern: Int], sawPair: Bool) {
     guard let items = raw as? [Any], !items.isEmpty else {
         throw GateHarnessError.invalidInput("\(path) must be a non-empty list")
     }
     var counts: [JudgedPattern: Int] = [:]
+    var sawPair = false
     for (index, item) in items.enumerated() {
         guard let cell = item as? [String: Any] else {
             throw GateHarnessError.invalidInput("\(path)[\(index)] must be a JSON object")
         }
-        guard let pattern = try judgedPattern(cell, path: "\(path)[\(index)]") else { continue }
+        let judged = try judgedPattern(cell, path: "\(path)[\(index)]")
         let count = try nonNegativeInteger(cell["n"], path: "\(path)[\(index)].n")
-        counts[pattern, default: 0] += count
+        if !judged.paired { continue }
+        sawPair = true
+        if let pattern = judged.pattern {
+            counts[pattern, default: 0] += count
+        }
     }
-    return counts
+    return (counts, sawPair)
 }
 
-private func countsFromWords(_ raw: Any?, path: String) throws -> [JudgedPattern: Int] {
+private func countsFromWords(_ raw: Any?, path: String) throws -> (counts: [JudgedPattern: Int], sawPair: Bool) {
     guard let items = raw as? [Any], !items.isEmpty else {
         throw GateHarnessError.invalidInput("\(path) must be a non-empty list")
     }
     var counts: [JudgedPattern: Int] = [:]
+    var sawPair = false
     for (index, item) in items.enumerated() {
         guard let word = item as? [String: Any] else {
             throw GateHarnessError.invalidInput("\(path)[\(index)] must be a JSON object")
         }
-        guard let pattern = try judgedPattern(word, path: "\(path)[\(index)]") else { continue }
-        counts[pattern, default: 0] += 1
+        let judged = try judgedPattern(word, path: "\(path)[\(index)]")
+        if !judged.paired { continue }
+        sawPair = true
+        if let pattern = judged.pattern {
+            counts[pattern, default: 0] += 1
+        }
     }
-    return counts
+    return (counts, sawPair)
 }
 
-private func judgedPattern(_ body: [String: Any], path: String) throws -> JudgedPattern? {
+/// A missing or null engine call is not a pair. The word is left out of the counts.
+/// A null reference with both engines present is unjudged: paired, and not counted.
+private func judgedPattern(_ body: [String: Any], path: String) throws -> (pattern: JudgedPattern?, paired: Bool) {
     if !body.keys.contains("reference_correct") {
         throw GateHarnessError.invalidInput("\(path).reference_correct is required")
     }
-    let apple = try boolean(body["apple_correct"], path: "\(path).apple_correct")
-    let sarvam = try boolean(body["sarvam_correct"], path: "\(path).sarvam_correct")
+    let apple = try optionalEngineCall(body, key: "apple_correct", path: path)
+    let sarvam = try optionalEngineCall(body, key: "sarvam_correct", path: path)
+    if apple == nil || sarvam == nil {
+        return (nil, false)
+    }
     if body["reference_correct"] is NSNull || body["reference_correct"] == nil {
-        return nil
+        return (nil, true)
     }
     let reference = try boolean(body["reference_correct"], path: "\(path).reference_correct")
-    return JudgedPattern(referenceCorrect: reference, appleCorrect: apple, sarvamCorrect: sarvam)
+    guard let apple, let sarvam else { return (nil, false) }
+    return (
+        JudgedPattern(referenceCorrect: reference, appleCorrect: apple, sarvamCorrect: sarvam),
+        true
+    )
+}
+
+private func optionalEngineCall(_ body: [String: Any], key: String, path: String) throws -> Bool? {
+    if !body.keys.contains(key) || body[key] is NSNull || body[key] == nil {
+        return nil
+    }
+    guard let value = strictBoolean(body[key]) else {
+        throw GateHarnessError.invalidInput("\(path).\(key) must be a boolean, or null if this engine has no result")
+    }
+    return value
 }
 
 private func totals(recordingID: String, childID: String, counts: [JudgedPattern: Int], path: String) throws -> RecordingTotals {

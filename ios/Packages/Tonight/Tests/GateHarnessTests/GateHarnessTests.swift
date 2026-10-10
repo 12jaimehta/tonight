@@ -39,6 +39,79 @@ final class GateHarnessTests: XCTestCase {
         }
     }
 
+    func test_MET28_missingAppleCorrectIsExcluded() throws {
+        var cells = passingCells()
+        cells.append([
+            "reference_correct": true,
+            "sarvam_correct": true,
+            "n": 7,
+        ])
+        let report = try evaluate(study([
+            child("c1", age: 7, schoolClass: 2, cells: cells),
+        ]))
+        XCTAssertEqual(report.decision, .apple)
+        XCTAssertEqual(report.apple.words, 100)
+        XCTAssertEqual(report.sarvam.words, 100)
+        XCTAssertEqual(report.apple.falseRejects, 0)
+        XCTAssertEqual(report.apple.falseAccepts, 0)
+        XCTAssertEqual(report.sarvam.falseRejects, 0)
+        XCTAssertEqual(report.sarvam.falseAccepts, 0)
+    }
+
+    func test_MET28_missingSarvamCorrectIsExcluded() throws {
+        var cells = passingCells()
+        cells.append([
+            "reference_correct": false,
+            "apple_correct": true,
+            "n": 3,
+        ])
+        let report = try evaluate(study([
+            child("c1", age: 7, schoolClass: 2, cells: cells),
+        ]))
+        XCTAssertEqual(report.decision, .apple)
+        XCTAssertEqual(report.apple.words, 100)
+        XCTAssertEqual(report.apple.falseAccepts, 0)
+        XCTAssertEqual(report.sarvam.words, 100)
+        XCTAssertEqual(report.sarvam.falseAccepts, 0)
+    }
+
+    func test_MET28_nullEngineCallIsExcluded() throws {
+        var cells = passingCells()
+        cells.append([
+            "reference_correct": true,
+            "apple_correct": NSNull(),
+            "sarvam_correct": false,
+            "n": 4,
+        ])
+        let report = try evaluate(study([
+            child("c1", age: 7, schoolClass: 2, cells: cells),
+        ]))
+        XCTAssertEqual(report.decision, .apple)
+        XCTAssertEqual(report.apple.words, 100)
+        XCTAssertEqual(report.apple.falseRejects, 0)
+        XCTAssertEqual(report.sarvam.words, 100)
+        XCTAssertEqual(report.sarvam.falseRejects, 0)
+    }
+
+    func test_MET28_recordingBecomesUnpairedAfterDroppedWords() throws {
+        let dropped = study([[
+            "child_id": "c1",
+            "age": 7,
+            "school_class": 2,
+            "recordings": [[
+                "recording_id": "c1-passage",
+                "words": [
+                    ["reference_correct": true, "sarvam_correct": true],
+                    ["reference_correct": false, "apple_correct": NSNull(), "sarvam_correct": false],
+                    ["reference_correct": true, "apple_correct": false],
+                ],
+            ]],
+        ]])
+        XCTAssertEqual(code(of: dropped), "UNPAIRED_RECORDING")
+        XCTAssertNotEqual(code(of: dropped), "DECIDED")
+        XCTAssertEqual(try code(ofFile: "met28"), "UNPAIRED_RECORDING")
+    }
+
     func test_OUT_OF_COHORT_missingOrOutOfRangeAgeOrClass() throws {
         XCTAssertEqual(code(of: study([child("c1", age: nil, schoolClass: 1, cells: passingCells())])), "OUT_OF_COHORT")
         XCTAssertEqual(code(of: study([child("c1", age: 9, schoolClass: 1, cells: passingCells())])), "OUT_OF_COHORT")
