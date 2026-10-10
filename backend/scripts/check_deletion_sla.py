@@ -43,6 +43,15 @@ def main() -> None:
             raise SystemExit(f"missing drop of {policy}")
     if "delete from storage.buckets where id = 'study-audio'" not in bucket:
         raise SystemExit("study-audio bucket is still created for clients")
+    erasure = (root / "20261010130300_delete_enqueues_erasure.sql").read_text(encoding="utf-8").lower()
+    for needle in (
+        "before delete on public.child_profile",
+        "before delete on public.parent",
+        "delete_all",
+        "enqueue_child_erasure",
+    ):
+        if needle not in erasure:
+            raise SystemExit(f"DEL-10 missing {needle}")
     print("ok deletion SLA")
 
 
