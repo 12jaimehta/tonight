@@ -172,7 +172,6 @@ final class SpeechPolicyTests: XCTestCase {
         let package = root.appendingPathComponent("Package.swift")
         let text = try sourceText(at: sources) + (try String(contentsOf: package))
         XCTAssertFalse(text.localizedCaseInsensitiveContains("firebase"), "NET-02b")
-        XCTAssertFalse(text.contains("import Supabase") && text.contains("github.com/firebase"), "NET-02b")
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
