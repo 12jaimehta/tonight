@@ -27,6 +27,9 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
+      <StoreKitConfigurationFileReference
+         identifier = "../Tonight.storekit">
+      </StoreKitConfigurationFileReference>
       <Testables>
          <TestableReference
             skipped = "NO">
@@ -60,6 +63,9 @@
             ReferencedContainer = "container:Tonight.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <StoreKitConfigurationFileReference
+         identifier = "../Tonight.storekit">
+      </StoreKitConfigurationFileReference>
       <CommandLineArguments>
          <CommandLineArgument
             argument = "-TonightFixedGate"

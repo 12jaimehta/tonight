@@ -18,23 +18,41 @@ public enum PaywallOffer: String, Codable, CaseIterable, Sendable {
 public struct CatalogPrice: Equatable, Sendable {
     public var offer: PaywallOffer
     public var price: RupeePrice
+    /// Free nights included with this offer. Zero means there is no trial.
+    public var trialNights: Int
 
-    public init(offer: PaywallOffer, price: RupeePrice) {
+    public init(offer: PaywallOffer, price: RupeePrice, trialNights: Int = 0) {
         self.offer = offer
         self.price = price
+        self.trialNights = trialNights
     }
 }
 
 /// Local prices. Nothing here contacts a store or the network.
 public enum PaywallCatalog {
+    /// Length of the annual plan's free trial. The monthly plan has no trial.
     public static let trialNights = 7
     public static let monthly = RupeePrice(rupees: 149)
-    public static let annualCap = RupeePrice(rupees: 1499)
+    /// Annual price. A higher annual price is not offered.
+    public static let annualCap = RupeePrice(rupees: 999)
+    public static let monthlyProductID = "com.tonight.homework.monthly"
+    public static let annualProductID = "com.tonight.homework.annual"
+    /// Family Sharing is not offered.
+    public static let familySharingOffered = false
+
+    public static func trialNights(for offer: PaywallOffer) -> Int {
+        switch offer {
+        case .monthly:
+            return 0
+        case .annual:
+            return trialNights
+        }
+    }
 
     public static var prices: [CatalogPrice] {
         [
-            CatalogPrice(offer: .monthly, price: monthly),
-            CatalogPrice(offer: .annual, price: annualCap),
+            CatalogPrice(offer: .monthly, price: monthly, trialNights: trialNights(for: .monthly)),
+            CatalogPrice(offer: .annual, price: annualCap, trialNights: trialNights(for: .annual)),
         ]
     }
 
