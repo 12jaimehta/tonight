@@ -50,6 +50,41 @@ public final class SpeechSceneController: @unchecked Sendable {
     }
 }
 
+/// The child, consent, and flag the app is showing. A change is what cancels an upload.
+public struct SpeechSessionModel: Equatable, Sendable {
+    public var childID: UUID?
+    public var consentActive: Bool
+    public var flagOn: Bool
+
+    public init(childID: UUID? = nil, consentActive: Bool = false, flagOn: Bool = false) {
+        self.childID = childID
+        self.consentActive = consentActive
+        self.flagOn = flagOn
+    }
+
+    public var watch: SpeechWatch {
+        SpeechWatch(childID: childID, consentActive: consentActive, flagOn: flagOn)
+    }
+
+    public func withdrawing() -> SpeechSessionModel {
+        var copy = self
+        copy.consentActive = false
+        return copy
+    }
+
+    public func turningFlagOff() -> SpeechSessionModel {
+        var copy = self
+        copy.flagOn = false
+        return copy
+    }
+
+    public func switchingChild(to childID: UUID) -> SpeechSessionModel {
+        var copy = self
+        copy.childID = childID
+        return copy
+    }
+}
+
 public struct SpeechWatch: Equatable, Sendable {
     public var childID: UUID?
     public var consentActive: Bool

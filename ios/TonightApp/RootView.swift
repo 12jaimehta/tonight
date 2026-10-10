@@ -14,6 +14,7 @@ struct RootView: View {
     @State private var notice = ""
     @State private var uploadStatus = ""
     @State private var speechScene = SpeechSceneController(runner: TonightSpeechScene.makeRunner())
+    @State private var speechSession = SpeechSessionModel(flagOn: TonightComposition.speechFlags.sarvamEnabled)
     @State private var challenge = ParentalGateBank.challenge(fixed: true)
 
     private var stubUpload: Bool {
@@ -40,6 +41,9 @@ struct RootView: View {
                 ChildHomeView(onParent: presentParent, uploadStatus: uploadStatus)
             }
         }
+        .onChange(of: speechSession) { _, session in
+            Task { await speechScene.apply(session.watch) }
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase != .active else { return }
             if stubUpload { uploadStatus = "Suspended" }
@@ -53,9 +57,26 @@ struct RootView: View {
         }
         .onAppear {
             _ = consentCenter.ledger.directory
+            refreshSpeechSession(childID: nil)
+            Task { await speechScene.apply(speechSession.watch) }
             guard stubUpload else { return }
             uploadStatus = "Uploading"
         }
+    }
+
+    /// Withdrawal, a flag turning off, or a different child each publish a new session, and `onChange` cancels the upload.
+    private func refreshSpeechSession(childID: UUID?) {
+        var session = speechSession
+        if let childID {
+            session = session.switchingChild(to: childID)
+            if consentCenter.record(for: childID)?.withdrawnAt != nil || consentCenter.record(for: childID)?.scopeIsActive(.onDevice) == false {
+                session = session.withdrawing()
+            }
+        }
+        if !TonightComposition.speechFlags.sarvamEnabled {
+            session = session.turningFlagOff()
+        }
+        speechSession = session
     }
 
     private func presentParent() {

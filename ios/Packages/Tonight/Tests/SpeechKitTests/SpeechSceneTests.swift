@@ -30,8 +30,11 @@ final class SpeechSceneTests: XCTestCase {
     func test_CG20_consentWithdrawalCancelsAndRequestsDeletion() async {
         let transport = SpyTransport()
         let scene = SpeechSceneController(runner: runner(transport))
-        await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: true))
-        await scene.apply(SpeechWatch(childID: child, consentActive: false, flagOn: true))
+        var session = SpeechSessionModel(childID: child, consentActive: true, flagOn: true)
+        await scene.apply(session.watch)
+        session = session.withdrawing()
+        await scene.apply(session.watch)
+        XCTAssertFalse(session.consentActive)
         XCTAssertTrue(scene.deletionRequested)
         let cancelled = await transport.wasCancelled()
         XCTAssertTrue(cancelled)
@@ -40,8 +43,11 @@ final class SpeechSceneTests: XCTestCase {
     func test_CG21_flagOffCancelsTheUpload() async {
         let transport = SpyTransport()
         let scene = SpeechSceneController(runner: runner(transport))
-        await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: true))
-        await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: false))
+        var session = SpeechSessionModel(childID: child, consentActive: true, flagOn: true)
+        await scene.apply(session.watch)
+        session = session.turningFlagOff()
+        await scene.apply(session.watch)
+        XCTAssertFalse(session.flagOn)
         XCTAssertTrue(scene.deletionRequested)
         let cancelled = await transport.wasCancelled()
         XCTAssertTrue(cancelled)
@@ -50,11 +56,29 @@ final class SpeechSceneTests: XCTestCase {
     func test_CG25_childChangeCancelsTheUpload() async {
         let transport = SpyTransport()
         let scene = SpeechSceneController(runner: runner(transport))
-        await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: true))
-        await scene.apply(SpeechWatch(childID: UUID(), consentActive: true, flagOn: true))
+        var session = SpeechSessionModel(childID: child, consentActive: true, flagOn: true)
+        await scene.apply(session.watch)
+        session = session.switchingChild(to: UUID())
+        await scene.apply(session.watch)
+        XCTAssertNotEqual(session.childID, child)
         XCTAssertTrue(scene.deletionRequested)
         let cancelled = await transport.wasCancelled()
         XCTAssertTrue(cancelled)
+    }
+
+    func test_CG33_LAT10_appAppliesTheSessionWatch() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("TonightApp/RootView.swift")
+        let source = try String(contentsOf: root, encoding: .utf8)
+        XCTAssertTrue(source.contains("speechScene.apply"))
+        XCTAssertTrue(source.contains("withdrawing()"))
+        XCTAssertTrue(source.contains("turningFlagOff()"))
+        XCTAssertTrue(source.contains("switchingChild"))
     }
 
     private func runner(_ transport: SpyTransport) -> SpeechAttemptRunner {
