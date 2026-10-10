@@ -1,7 +1,9 @@
 import DesignSystem
 import SwiftUI
 
-/// M1-01 Sign in. Apple and email are placeholders: nothing leaves the phone.
+/// M1-01 Sign in. Email OTP is the login that a Personal Team can ship.
+/// The Apple button appears only when `SignInWithApple` is compiled on.
+/// Nothing leaves the phone.
 struct SignInScreen: View {
     @Bindable var model: SignInModel
     var onApple: @MainActor () -> Void
@@ -37,11 +39,13 @@ struct SignInScreen: View {
             .padding(.top, 8)
             .accessibilityElement(children: .contain)
             Spacer(minLength: 12)
-            Button(action: onApple) {
-                Label("Sign in with Apple", systemImage: "apple.logo")
+            if SignInWithApple.isEnabled {
+                Button(action: onApple) {
+                    Label("Sign in with Apple", systemImage: "apple.logo")
+                }
+                .buttonStyle(ParentWideButtonStyle(fill: .black, foreground: .white))
+                .accessibilityIdentifier("signin.apple")
             }
-            .buttonStyle(ParentWideButtonStyle(fill: .black, foreground: .white))
-            .accessibilityIdentifier("signin.apple")
             Button(action: { model.continueWithEmail() }) {
                 Label("Continue with email", systemImage: "envelope")
             }
