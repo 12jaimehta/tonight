@@ -3,10 +3,46 @@ import XCTest
 final class TonightUITests: XCTestCase {
     // Camera capture, the microphone, on-device speech recognition, and spoken playback
     // are not driven here. Those screens show their denied and idle states without the hardware.
-    func testSignInPlaceholderContinues() {
+    func testEmailOTPRemainsAndAppleButtonIsAbsent() {
         let app = launch()
-        app.buttons["signin.apple"].tap()
+        let email = app.buttons["signin.email"]
+        XCTAssertTrue(email.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["signin.apple"].exists)
+        XCTAssertFalse(app.buttons["Sign in with Apple"].exists)
+        email.tap()
+        let code = app.textFields["signin.code"]
+        XCTAssertTrue(code.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Check your email"].exists)
+        code.tap()
+        code.typeText("123456")
+        let verify = app.buttons["signin.verify"]
+        XCTAssertTrue(verify.waitForExistence(timeout: 5))
+        XCTAssertTrue(verify.isEnabled)
+        verify.tap()
         XCTAssertTrue(app.staticTexts["A grown-up sets up Tonight"].waitForExistence(timeout: 8))
+    }
+
+    func testPersonalTeamBuildOmitsSignInWithApple() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appRoot = iosRoot.appendingPathComponent("TonightApp")
+        let sources = FileManager.default.enumerator(at: appRoot, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? []
+        let swift = try sources.filter { $0.pathExtension == "swift" }.map { try String(contentsOf: $0) }.joined(separator: "\n")
+        XCTAssertFalse(swift.contains("import AuthenticationServices"))
+        XCTAssertFalse(swift.contains("ASAuthorization"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: appRoot.appendingPathComponent("Tonight.entitlements").path))
+        let project = try String(contentsOf: iosRoot.appendingPathComponent("Tonight.xcodeproj/project.pbxproj"))
+        XCTAssertFalse(project.contains("CODE_SIGN_ENTITLEMENTS"))
+        XCTAssertFalse(project.contains("com.apple.developer.applesignin"))
+        XCTAssertFalse(project.contains("aps-environment"))
+        XCTAssertFalse(project.contains("com.apple.developer.icloud"))
+        XCTAssertFalse(project.contains("com.apple.developer.associated-domains"))
+        XCTAssertFalse(project.contains("keychain-access-groups"))
+        XCTAssertTrue(project.contains("DEVELOPMENT_TEAM = \"\";"))
+        let info = try String(contentsOf: appRoot.appendingPathComponent("Info.plist"))
+        XCTAssertFalse(info.contains("UIBackgroundModes"))
+        XCTAssertFalse(info.contains("aps-environment"))
     }
 
     func testConsentStaysClosedUntilThePlaceholderIsAccepted() {
