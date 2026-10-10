@@ -7,7 +7,9 @@
     "path": "/functions/v1/sarvam-proxy",
     "placeholderHost": "project-ref.supabase.co",
     "headers": {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "Authorization": "Bearer <parent session access token>",
+      "apikey": "<supabase anon key>"
     },
     "body": {
       "type": "object",
