@@ -52,6 +52,18 @@ def main() -> None:
     ):
         if needle not in erasure:
             raise SystemExit(f"DEL-10 missing {needle}")
+    entitlement = (root / "20261010130400_entitlement_service_role.sql").read_text(encoding="utf-8").lower()
+    for needle in (
+        "drop policy if exists entitlement_insert",
+        "drop policy if exists entitlement_update",
+        "revoke insert, update, delete on table public.entitlement from authenticated",
+        "grant execute on function public.grant_entitlement",
+    ):
+        if needle not in entitlement:
+            raise SystemExit(f"KIDS-08 missing {needle}")
+    if "to authenticated" in entitlement and "grant execute" in entitlement:
+        if "grant execute on function public.grant_entitlement" in entitlement and "to authenticated" in entitlement.split("grant execute", 1)[1]:
+            raise SystemExit("authenticated role can still execute grant_entitlement")
     print("ok deletion SLA")
 
 
