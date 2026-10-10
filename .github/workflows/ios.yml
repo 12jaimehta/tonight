@@ -253,3 +253,6 @@ jobs:
 
       - name: Cross-check the gate harness
         run: python3 ios/scripts/gate_harness.py
+
+      - name: Parental gate wraps external links
+        run: sh ios/scripts/check_parental_gate.sh

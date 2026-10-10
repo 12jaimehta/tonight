@@ -13,6 +13,7 @@ struct RootView: View {
     @State private var notice = ""
     @State private var uploadStatus = ""
     @State private var speechScene = SpeechSceneController(runner: TonightSpeechScene.makeRunner())
+    @State private var challenge = ParentalGateBank.challenge(fixed: true)
 
     private var stubUpload: Bool {
         ProcessInfo.processInfo.arguments.contains("-TonightStubUpload")
@@ -20,10 +21,6 @@ struct RootView: View {
 
     private var fixedGate: Bool {
         ProcessInfo.processInfo.arguments.contains("-TonightFixedGate")
-    }
-
-    private var challenge: GateChallenge {
-        ParentalGateBank.challenge(fixed: fixedGate)
     }
 
     var body: some View {
@@ -39,7 +36,7 @@ struct RootView: View {
                     onClose: closeParent
                 )
             } else {
-                ChildHomeView(onParent: { showingParent = true }, uploadStatus: uploadStatus)
+                ChildHomeView(onParent: presentParent, uploadStatus: uploadStatus)
             }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -57,6 +54,16 @@ struct RootView: View {
             guard stubUpload else { return }
             uploadStatus = "Uploading"
         }
+    }
+
+    private func presentParent() {
+        if fixedGate {
+            challenge = ParentalGateBank.challenge(fixed: true)
+        } else {
+            var generator = SystemRandomNumberGenerator()
+            challenge = ParentalGateBank.randomChallenge(using: &generator)
+        }
+        showingParent = true
     }
 
     private func submit() {
@@ -97,7 +104,7 @@ struct ChildHomeView: View {
                     )
                     .accessibilityIdentifier("subject.\(subject.id)")
                 }
-                Button("Parent", action: onParent)
+                Button("Parent", action: { presentParent() })
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("parent.button")
                 if !uploadStatus.isEmpty {

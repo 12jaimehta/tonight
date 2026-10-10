@@ -30,14 +30,20 @@ public enum ParentalGateBank {
     ]
 
     /// `-TonightFixedGate` uses the first product so a UI test can solve it.
+    /// A real presentation passes a fresh random index and keeps that challenge until submit.
     public static func challenge(fixed: Bool, offset: Int = 0) -> GateChallenge {
         if fixed { return challenges[0] }
         let index = offset % challenges.count
         return challenges[index]
     }
+
+    public static func randomChallenge<G: RandomNumberGenerator>(using generator: inout G) -> GateChallenge {
+        let index = Int(generator.next() % UInt64(challenges.count))
+        return challenges[index]
+    }
 }
 
-/// Three wrong answers lock the gate for 60 seconds. The lockout lives in memory and is cleared on background or launch.
+/// Three wrong answers lock the gate for 60 seconds. The lockout stays in memory across backgrounding. This is not a PIN.
 public struct ParentalGateSession: Equatable, Sendable {
     public static let failureLimit = 3
     public static let lockout: TimeInterval = 60
@@ -68,8 +74,13 @@ public struct ParentalGateSession: Equatable, Sendable {
         return .incorrect(remaining: Self.failureLimit - failures)
     }
 
-    public mutating func resetForBackground() {
-        failures = 0
-        lockedUntil = nil
+    /// Backgrounding may clear the unlocked screen. It does not reset failures or the lockout.
+    public mutating func resetForBackground() {}
+}
+
+/// A link or purchase leaves the app only after the gate is unlocked. A locked gate has no destination.
+public enum ParentalGatedLink {
+    public static func destination(_ url: URL, unlocked: Bool) -> URL? {
+        unlocked ? url : nil
     }
 }
