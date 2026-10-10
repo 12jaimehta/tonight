@@ -3,7 +3,11 @@ import { handleSarvamProxy, logLine } from "./handler.ts";
 import { verifyParentJwt } from "./jwt.ts";
 import { createSarvamClient } from "./sarvam.ts";
 
-const jwtSecret = Deno.env.get("SUPABASE_JWT_SECRET") ?? "";
+// config.toml sets verify_jwt = true, so the platform checks the parent JWT
+// before this function runs. A custom SUPABASE_JWT_SECRET is not used: hosted
+// projects reject that secret name. With no HMAC secret, verifyParentJwt asks
+// Auth for the user.
+const jwtSecret = "";
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const sarvamKey = Deno.env.get("SARVAM_API_KEY") ?? "";
