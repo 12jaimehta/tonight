@@ -32,6 +32,17 @@ def main() -> None:
     purge = latest_function(combined, "purge_due_study_audio")
     if "delete from storage.objects" in purge.lower():
         raise SystemExit("purge_due_study_audio still deletes storage metadata in SQL")
+    bucket = (root / "20261010130200_drop_study_audio_bucket.sql").read_text(encoding="utf-8").lower()
+    for policy in (
+        "study_audio_owner_select",
+        "study_audio_owner_insert",
+        "study_audio_owner_update",
+        "study_audio_owner_delete",
+    ):
+        if f"drop policy if exists {policy}" not in bucket:
+            raise SystemExit(f"missing drop of {policy}")
+    if "delete from storage.buckets where id = 'study-audio'" not in bucket:
+        raise SystemExit("study-audio bucket is still created for clients")
     print("ok deletion SLA")
 
 
