@@ -169,7 +169,7 @@ final class SpeechLedgerTests: XCTestCase {
         XCTAssertEqual(sender.sent.count, 1)
     }
 
-    func test_DEL15_deletionPostUsesTheConfiguredHost() async throws {
+    func test_N30_parentTokenIsNotSentToStoragePurge() async throws {
         let host = URL(string: "https://project-ref.supabase.co")!
         TonightEndpoints.use(SupabaseSpeechConfig(baseURL: host, anonKey: "anon-test"))
         let child = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
@@ -182,23 +182,18 @@ final class SpeechLedgerTests: XCTestCase {
             nextAttemptAt: Date(timeIntervalSince1970: 10),
             completedAt: nil
         )
-        let captured = OSAllocatedUnfairLock<URLRequest?>(initialState: nil)
+        let captured = OSAllocatedUnfairLock<[URLRequest]>(initialState: [])
         let sender = HostDeletionSender(
-            post: { request in captured.withLock { $0 = request } },
+            post: { request in captured.withLock { $0.append(request) } },
             baseURL: host,
             anonKey: "anon-test",
             accessToken: "parent-token"
         )
         try await sender.send(job)
-        let request = try XCTUnwrap(captured.withLock { $0 })
-        XCTAssertEqual(request.url?.host, "project-ref.supabase.co")
-        XCTAssertEqual(request.url?.path, "/functions/v1/storage-purge")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer parent-token")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "anon-test")
-        let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: String]
-        XCTAssertEqual(body, ["mode": "due"])
-        XCTAssertNil(body?["child_profile_id"])
-        XCTAssertNil(body?["object_prefix"])
+        let requests = captured.withLock { $0 }
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertFalse(requests.contains { $0.url?.path == "/functions/v1/storage-purge" })
+        XCTAssertFalse(requests.contains { $0.value(forHTTPHeaderField: "Authorization") == "Bearer parent-token" })
     }
 
     func test_N12_deletionCallMatchesTheSharedContract() async throws {
@@ -224,58 +219,6 @@ final class SpeechLedgerTests: XCTestCase {
         let mode = try XCTUnwrap(properties["mode"] as? [String: Any])
         let allowed = try XCTUnwrap(mode["enum"] as? [String])
         XCTAssertEqual(allowed, ["due", "retention"])
-
-        let host = URL(string: "https://project-ref.supabase.co")!
-        TonightEndpoints.use(SupabaseSpeechConfig(baseURL: host, anonKey: "anon-test"))
-        let captured = OSAllocatedUnfairLock<URLRequest?>(initialState: nil)
-        let sender = HostDeletionSender(
-            post: { request in captured.withLock { $0 = request } },
-            baseURL: host,
-            anonKey: "anon-test",
-            accessToken: "parent-access-token"
-        )
-        let child = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
-        try await sender.send(ServerDeletionJob(
-            id: UUID(),
-            childProfileID: child,
-            prefix: "\(child.uuidString)/",
-            enqueuedAt: Date(timeIntervalSince1970: 10),
-            attempts: 0,
-            nextAttemptAt: Date(timeIntervalSince1970: 10),
-            completedAt: nil
-        ))
-        let request = try XCTUnwrap(captured.withLock { $0 })
-        XCTAssertEqual(request.httpMethod, requestSpec["method"] as? String)
-        XCTAssertEqual(request.url?.path, requestSpec["path"] as? String)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer parent-access-token")
-        XCTAssertFalse(request.value(forHTTPHeaderField: "Authorization") == "Bearer ")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
-        let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: String]
-        XCTAssertEqual(Set((body ?? [:]).keys), Set(required))
-        XCTAssertTrue(allowed.contains(body?["mode"] ?? ""))
-        XCTAssertEqual(body?["mode"], HostDeletionSender.dueMode)
-
-        let empty = HostDeletionSender(
-            post: { _ in },
-            baseURL: host,
-            anonKey: "anon-test",
-            accessToken: ""
-        )
-        do {
-            try await empty.send(ServerDeletionJob(
-                id: UUID(),
-                childProfileID: child,
-                prefix: "\(child.uuidString)/",
-                enqueuedAt: Date(),
-                attempts: 0,
-                nextAttemptAt: Date(),
-                completedAt: nil
-            ))
-            XCTFail("an empty access token must not be sent")
-        } catch DeletionSendError.notConfigured {
-        } catch {
-            XCTFail("unexpected \(error)")
-        }
 
         let app = contractURL
             .deletingLastPathComponent()

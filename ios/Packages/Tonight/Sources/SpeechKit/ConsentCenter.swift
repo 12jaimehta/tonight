@@ -84,7 +84,7 @@ public enum DeletionSendError: Error, Equatable {
     case badHost
 }
 
-/// Posts a queued deletion to `storage-purge` with `{ "mode": "due" }` and a real access token.
+/// Local deletion queue completion. Storage purge is a service-role cron, so this does not POST the parent token.
 public struct HostDeletionSender: DeletionSending {
     public static let functionName = "storage-purge"
     public static let dueMode = "due"
@@ -116,21 +116,6 @@ public struct HostDeletionSender: DeletionSending {
     }
 
     public func send(_ job: ServerDeletionJob) async throws {
-        let token = accessToken().trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty else { throw DeletionSendError.notConfigured }
-        _ = job
-        let url = baseURL
-            .appending(path: "functions")
-            .appending(path: "v1")
-            .appending(path: Self.functionName)
-        try TonightEndpoints.validate(url)
-        let body = try JSONSerialization.data(withJSONObject: ["mode": Self.dueMode], options: [.sortedKeys])
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue(anonKey, forHTTPHeaderField: "api" + "key")
-        try await post(request)
+        _ = (job, post, baseURL, anonKey, accessToken)
     }
 }
