@@ -56,6 +56,7 @@ final class PaywallKitTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let data = try Data(contentsOf: iosRoot.appendingPathComponent("Tonight.storekit"))
         let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let settings = try XCTUnwrap(root["settings"] as? [String: Any])
