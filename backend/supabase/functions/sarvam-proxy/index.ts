@@ -21,6 +21,7 @@ Deno.serve((req) =>
       supabaseUrl,
       anonKey,
       fetchImpl: globalThis.fetch,
+      policyVersion: Deno.env.get("CONSENT_POLICY_VERSION") ?? "2026-10-09",
     }),
     callSarvam: createSarvamClient({
       apiKey: sarvamKey,

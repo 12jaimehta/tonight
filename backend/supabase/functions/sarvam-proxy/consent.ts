@@ -7,6 +7,7 @@ export function createConsentLookup(deps: {
   supabaseUrl: string;
   anonKey: string;
   fetchImpl: FetchLike;
+  policyVersion: string;
 }): (input: { parentId: string; childProfileId: string; accessToken: string }) => Promise<boolean> {
   return async ({ parentId, childProfileId, accessToken }) => {
     if (!deps.supabaseUrl) throw new Error("consent_lookup_unconfigured");
@@ -34,11 +35,11 @@ export function createConsentLookup(deps: {
     return rows.some((row) => {
       if (!row || typeof row !== "object") return false;
       const record = row as { version?: unknown; scopes?: unknown; withdrawn_at?: unknown };
-      return typeof record.version === "string" &&
-        record.version.trim().length > 0 &&
+      const scopes = Array.isArray(record.scopes) ? record.scopes : [];
+      return record.version === deps.policyVersion &&
         record.withdrawn_at == null &&
-        Array.isArray(record.scopes) &&
-        record.scopes.includes("server_speech");
+        scopes.includes("server_speech") &&
+        scopes.includes("on_device_speech");
     });
   };
 }
