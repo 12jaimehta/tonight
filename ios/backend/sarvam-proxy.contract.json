@@ -1,7 +1,7 @@
 {
   "name": "sarvam-proxy",
   "status": "assumed",
-  "notes": "The iOS client posts this shape and reads transcript, latencyMs, and cost. Word timings are not parsed yet. The hostname is a placeholder. No vendor key is sent by the app.",
+  "notes": "The iOS client posts this shape and reads transcript, latencyMs, and cost. Word timings are not parsed yet. The hostname is a placeholder. No vendor key is sent by the app. The body uses the same names as the Edge Function.",
   "request": {
     "method": "POST",
     "path": "/functions/v1/sarvam-proxy",
@@ -12,13 +12,13 @@
     "body": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["locale", "audioBase64", "contentType", "consentRecordId", "consentVersion"],
+      "required": ["child_profile_id", "audio_base64", "locale", "consent_record_id", "consent_version"],
       "properties": {
+        "child_profile_id": { "type": "string", "format": "uuid" },
+        "audio_base64": { "type": "string" },
         "locale": { "type": "string", "example": "en-IN" },
-        "audioBase64": { "type": "string" },
-        "contentType": { "type": "string", "const": "audio/wav" },
-        "consentRecordId": { "type": "string" },
-        "consentVersion": { "type": "string", "example": "2026-10-09" }
+        "consent_record_id": { "type": "string", "format": "uuid" },
+        "consent_version": { "type": "string", "example": "2026-10-09" }
       }
     },
     "timeoutSeconds": 8
