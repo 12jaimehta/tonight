@@ -580,7 +580,14 @@ final class TonightModel {
     func makeNotebook() {
         draft.checkMode = .parent
         draft.manualFallback = false
+        draft.revokeTyping()
         route = .review
+    }
+
+    /// Opens the parental gate. The flag flips only after the gate unlocks.
+    func allowTyping() {
+        guard draft.checkMode == .auto, !draft.typingEnabled else { return }
+        openGate(for: .enableTyping)
     }
 
     func backFromPage() {
@@ -641,6 +648,8 @@ final class TonightModel {
                 }
             case .parentCheck:
                 route = .parentCheck
+            case .enableTyping:
+                _ = draft.enableTyping(gateUnlocked: true)
             }
         case .locked:
             gate.presented = false
@@ -690,6 +699,7 @@ final class TonightModel {
         await session.finish(expected: task.confirmedText ?? "")
         guard let mark = session.mark else { return }
         today.marks[task.id] = mark
+        today.readingModes[task.id] = session.inputMode
         today.statuses[task.id] = .marked(correct: mark.correct, total: mark.total)
         route = .childResult
     }
@@ -767,6 +777,12 @@ final class TonightModel {
             })?.stars
         }
         guard let mark = today.marks[task.id] else { return nil }
-        return EnglishStars.count(for: mark)
+        return EnglishStars.count(for: mark, inputMode: readingMode(for: task.id))
+    }
+
+    func readingMode(for taskID: UUID) -> InputMode {
+        if let mode = today.readingModes[taskID] { return mode }
+        if readAloud?.taskID == taskID { return readAloud?.inputMode ?? .spoken }
+        return .spoken
     }
 }

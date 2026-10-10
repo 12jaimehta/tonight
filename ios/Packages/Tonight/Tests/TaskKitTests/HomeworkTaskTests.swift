@@ -183,6 +183,74 @@ final class HomeworkTaskTests: XCTestCase {
         XCTAssertTrue(NoLessonMedia().media(for: UUID()).isEmpty)
         let read = ReadAloudActivity().score(attempt: ActivityAttempt(expectedText: "the cat", heardText: "the cat"))
         XCTAssertEqual(read.correct, 2)
+        XCTAssertEqual(ActivityAttempt(expectedText: "the cat", heardText: "the cat").inputMode, .spoken)
+        XCTAssertFalse(ReadAloudActivity.offersKeyboard)
+    }
+
+    func testChildCannotEnableTypingAndParentNeedsTheGate() throws {
+        let task = try HomeworkTask.make(
+            childID: UUID(),
+            subjectID: "english",
+            schoolClass: "1",
+            instruction: "Read",
+            checkMode: .auto,
+            confirmedText: "the cat sat"
+        ).get()
+        XCTAssertFalse(task.typingEnabled)
+        XCTAssertNil(task.settingTypingEnabled(true, editor: .child, gateUnlocked: true))
+        XCTAssertNil(task.settingTypingEnabled(true, editor: .child, gateUnlocked: false))
+        XCTAssertNil(task.settingTypingEnabled(true, editor: .parent, gateUnlocked: false))
+        XCTAssertFalse(TypingAccess.canEnable(editor: .child, gateUnlocked: true))
+        let enabled = try XCTUnwrap(task.settingTypingEnabled(true, editor: .parent, gateUnlocked: true))
+        XCTAssertTrue(enabled.typingEnabled)
+        XCTAssertFalse(task.typingEnabled)
+
+        let notebook = try HomeworkTask.make(
+            childID: UUID(),
+            subjectID: "maths",
+            schoolClass: "1",
+            instruction: "Sums",
+            checkMode: .parent,
+            pagePhotoRefs: [PhotoRef(relativePath: "sums.jpg")],
+            stars: 3
+        ).get()
+        XCTAssertNil(notebook.settingTypingEnabled(true, editor: .parent, gateUnlocked: true))
+        XCTAssertEqual(notebook.stars, 3)
+        XCTAssertEqual(NotebookStars.count(picked: 3), 3)
+    }
+
+    func testPhotoAndPasteAreParentSuppliedAndTemplateIsUnbuilt() {
+        let photo = PhotoContentSource(ocrText: " the cat sat ")
+        let paste = PasteContentSource(pastedText: " birds fly ")
+        XCTAssertEqual(TaskContent.confirmedPassage(from: photo), "the cat sat")
+        XCTAssertEqual(TaskContent.confirmedPassage(from: paste), "birds fly")
+        XCTAssertTrue(TaskContent.isParentSupplied(.photo))
+        XCTAssertTrue(TaskContent.isParentSupplied(.paste))
+        XCTAssertFalse(TaskContent.recordsTypedAttempt(.photo))
+        XCTAssertFalse(TaskContent.recordsTypedAttempt(.paste))
+        XCTAssertFalse(TaskContent.recordsTypedAttempt(.template))
+
+        let future = UnbuiltTemplateSource()
+        XCTAssertEqual(future.kind, .template)
+        XCTAssertEqual(ContentSourceKind.allCases, [.photo, .paste, .template])
+        XCTAssertNil(TaskContent.confirmedPassage(from: future))
+        XCTAssertFalse(TaskContent.isParentSupplied(.template))
+        XCTAssertNotEqual(ActivityAttempt().inputMode, .typed)
+    }
+
+    func testSpokenAndTypedAttemptsFeedStarsAndHistory() {
+        let spoken = ActivityAttempt(expectedText: "the cat sat", heardText: "the cat sat", inputMode: .spoken)
+        let typed = ActivityAttempt(expectedText: "the cat sat", heardText: "the cat sat", inputMode: .typed)
+        let spokenMark = ReadAloudActivity().score(attempt: spoken)
+        let typedMark = ReadAloudActivity().score(attempt: typed)
+        XCTAssertEqual(spokenMark.percent, 100)
+        XCTAssertEqual(typedMark.percent, 100)
+        XCTAssertEqual(EnglishStars.count(for: spokenMark, inputMode: spoken.inputMode), 3)
+        XCTAssertEqual(EnglishStars.count(for: typedMark, inputMode: typed.inputMode), 1)
+        let samples = [spoken.readingSample(percent: spokenMark.percent), typed.readingSample(percent: typedMark.percent)].compactMap { $0 }
+        XCTAssertEqual(samples.map(\.inputMode), [.spoken, .typed])
+        XCTAssertEqual(ReadingHistory.accuracy(of: samples), 100)
+        XCTAssertEqual(ReadingHistory.trend(of: samples), [100])
     }
 
     private func resultIssues(_ result: Result<HomeworkTask, HomeworkRulesError>) -> [HomeworkIssue] {
@@ -191,6 +259,11 @@ final class HomeworkTaskTests: XCTestCase {
         case .failure(let error): return error.issues
         }
     }
+}
+
+private struct UnbuiltTemplateSource: TaskContentSource {
+    var kind: ContentSourceKind { .template }
+    func confirmedText() -> String { "a template passage that is not built" }
 }
 
 private struct SeamActivity: Activity {

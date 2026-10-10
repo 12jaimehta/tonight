@@ -39,6 +39,7 @@ struct AddPageScreen: View {
                                 .accessibilityIdentifier("task.fromPhotos")
                         }
                         if draft.checkMode == .auto {
+                            // Parent paste supplies the passage. It is not a typed child attempt.
                             Button("Type the text instead", action: onTypeInstead)
                                 .frame(minHeight: 44)
                                 .accessibilityIdentifier("task.typeInstead")

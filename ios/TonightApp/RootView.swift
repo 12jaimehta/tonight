@@ -80,9 +80,13 @@ struct RootView: View {
                     ReviewSaveScreen(
                         child: child,
                         draft: model.draft,
+                        gate: model.gate,
                         onBack: model.backFromReview,
                         onSaveLater: { model.saveDraft(handOff: false) },
-                        onSaveHand: { model.saveDraft(handOff: true) }
+                        onSaveHand: { model.saveDraft(handOff: true) },
+                        onAllowTyping: model.allowTyping,
+                        onGateKey: model.pressGate,
+                        onCloseGate: model.closeGate
                     )
                 }
             case .readAloud:
@@ -98,7 +102,14 @@ struct RootView: View {
                 }
             case .childResult:
                 if let child = model.child, let session = model.readAloud, let task = model.task(session.taskID), let mark = (session.mark ?? model.today.marks[task.id]) {
-                    ChildResultScreen(child: child, task: task, mark: mark, speech: model.speech, onHome: { model.route = .childHome })
+                    ChildResultScreen(
+                        child: child,
+                        task: task,
+                        mark: mark,
+                        inputMode: model.readingMode(for: task.id),
+                        speech: model.speech,
+                        onHome: { model.route = .childHome }
+                    )
                 }
             case .notebook:
                 if let child = model.child, let session = model.notebook, let task = model.task(session.taskID) {
@@ -130,6 +141,7 @@ struct RootView: View {
                         child: child,
                         task: task,
                         mark: mark,
+                        inputMode: model.readingMode(for: task.id),
                         praise: model.praiseDraft,
                         onBack: { model.route = .today },
                         onToggle: model.setMarkShown,

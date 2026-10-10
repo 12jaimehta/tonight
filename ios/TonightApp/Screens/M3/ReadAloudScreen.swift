@@ -2,6 +2,7 @@ import DesignSystem
 import SwiftUI
 
 /// M3-02 Read aloud. Buttons change the static state. The microphone is not opened.
+/// There is no keyboard. Typing the reading is not offered on this screen.
 struct ReadAloudScreen: View {
     @Bindable var session: ReadAloudSession
     var passage: String

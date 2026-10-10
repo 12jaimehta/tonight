@@ -43,8 +43,8 @@ let package = Package(
         .target(name: "CaptureKit"),
         .testTarget(name: "CaptureKitTests", dependencies: ["CaptureKit"]),
 
-        .target(name: "PracticeKit"),
-        .testTarget(name: "PracticeKitTests", dependencies: ["PracticeKit"]),
+        .target(name: "PracticeKit", dependencies: ["MarkingKit"]),
+        .testTarget(name: "PracticeKitTests", dependencies: ["PracticeKit", "MarkingKit"]),
 
         .target(name: "PaywallKit"),
         .testTarget(name: "PaywallKitTests", dependencies: ["PaywallKit"]),

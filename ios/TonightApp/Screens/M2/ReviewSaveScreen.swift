@@ -6,9 +6,13 @@ import SwiftUI
 struct ReviewSaveScreen: View {
     var child: ChildProfile
     @Bindable var draft: NewTaskModel
+    var gate: GateModel? = nil
     var onBack: @MainActor () -> Void
     var onSaveLater: @MainActor () -> Void
     var onSaveHand: @MainActor () -> Void
+    var onAllowTyping: @MainActor () -> Void = {}
+    var onGateKey: @MainActor (String) -> Void = { _ in }
+    var onCloseGate: @MainActor () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -31,6 +35,18 @@ struct ReviewSaveScreen: View {
                         Text("If it's hidden, \(child.nickname) sees \"All done!\" and no score or stars. You'll always see the full mark.")
                             .font(TonightFont.parent(CGFloat(TonightType.Text.pSm)))
                             .foregroundStyle(TonightColor.pInkSoft)
+                        if draft.checkMode == .auto {
+                            Button(action: onAllowTyping) {
+                                Text(draft.typingEnabled ? "Typing on for this task" : "Allow typing")
+                            }
+                            .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .bold))
+                            .frame(minHeight: 48)
+                            .disabled(draft.typingEnabled)
+                            .accessibilityIdentifier("task.allowTyping")
+                            Text("Only a grown-up can turn typing on, after the grown-up check. \(child.nickname)'s reading screen stays read-aloud.")
+                                .font(TonightFont.parent(CGFloat(TonightType.Text.pSm)))
+                                .foregroundStyle(TonightColor.pInkSoft)
+                        }
                         if !draft.canSave && !draft.saving {
                             Text(blockReason)
                                 .font(TonightFont.parent(CGFloat(TonightType.Text.pSm), weight: .semibold))
@@ -58,6 +74,9 @@ struct ReviewSaveScreen: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
+            }
+            if let gate, gate.presented {
+                ParentalGateSheet(gate: gate, childName: child.nickname, onKey: onGateKey, onClose: onCloseGate)
             }
         }
     }

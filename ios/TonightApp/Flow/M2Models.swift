@@ -28,6 +28,7 @@ final class TodayModel {
     var tasks: [HomeworkTask] = []
     var statuses: [UUID: TodayTaskState] = [:]
     var marks: [UUID: Mark] = [:]
+    var readingModes: [UUID: InputMode] = [:]
     var notebookAttempts: [NotebookAttempt] = []
     var parentChecks: [ParentCheck] = []
     var praises: [Praise] = []
@@ -93,6 +94,7 @@ final class TodayModel {
             let mark = TodayCopy.sampleMark()
             statuses[task.id] = .marked(correct: mark.correct, total: mark.total)
             marks[task.id] = mark
+            readingModes[task.id] = .spoken
         }
         if case .success(let task) = maths {
             built.append(task)
@@ -202,6 +204,7 @@ final class NewTaskModel {
     var markChoice: MarkChoice = .useDefault
     var saving = false
     var editingLineID: Int?
+    private(set) var typingEnabled = false
     let ocr: any OCREngine = PlaceholderOCR(lines: NewTaskModel.sampleOCRLines)
 
     static let sampleOCRLines: [OCRLine] = [
@@ -217,10 +220,40 @@ final class NewTaskModel {
         }
     }
 
+    /// Paste wins when the parent typed the passage. Otherwise the confirmed OCR lines are the passage.
+    var passageKind: ContentSourceKind {
+        let pasted = manualText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if manualFallback || !pasted.isEmpty { return .paste }
+        return .photo
+    }
+
     var confirmedText: String {
-        let typed = manualText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !typed.isEmpty { return typed }
-        return lines.filter(\.included).map(\.text).joined(separator: "\n")
+        guard checkMode == .auto, let source = contentSource() else { return "" }
+        return TaskContent.confirmedPassage(from: source) ?? ""
+    }
+
+    func contentSource() -> (any TaskContentSource)? {
+        switch passageKind {
+        case .photo:
+            let ocr = lines.filter(\.included).map(\.text).joined(separator: "\n")
+            return PhotoContentSource(ocrText: ocr)
+        case .paste:
+            return PasteContentSource(pastedText: manualText)
+        case .template:
+            return nil
+        }
+    }
+
+    /// The parent already passed the gate. The child has no call that reaches this.
+    func enableTyping(gateUnlocked: Bool) -> Bool {
+        guard checkMode == .auto else { return false }
+        guard TypingAccess.canEnable(editor: .parent, gateUnlocked: gateUnlocked) else { return false }
+        typingEnabled = true
+        return true
+    }
+
+    func revokeTyping() {
+        typingEnabled = false
     }
 
     var wordCount: Int {
@@ -286,6 +319,8 @@ final class NewTaskModel {
             manualFallback = true
             return
         }
+        manualFallback = false
+        manualText = ""
         applyPlaceholderOCR(image)
     }
 
@@ -302,6 +337,8 @@ final class NewTaskModel {
         pageRelativePath = nil
         captured = nil
         lines = []
+        manualFallback = false
+        manualText = ""
     }
 
     func makeTask(child: ChildProfile) -> HomeworkTask? {
@@ -315,11 +352,15 @@ final class NewTaskModel {
             instruction: instruction,
             checkMode: checkMode,
             confirmedText: text,
-            pagePhotoRefs: photos
+            pagePhotoRefs: photos,
+            passageSource: checkMode == .auto ? passageKind : nil
         )
         guard case .success(var task) = result else { return nil }
         guard PhotoCapturePolicy.writesToPhotoLibrary == false else { return nil }
         task.showMarkOverride = showMarkOverride
+        if typingEnabled, let allowed = task.settingTypingEnabled(true, editor: .parent, gateUnlocked: true) {
+            task = allowed
+        }
         return task
     }
 

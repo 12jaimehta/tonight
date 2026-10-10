@@ -10,6 +10,7 @@ struct ChildResultScreen: View {
     var child: ChildProfile
     var task: HomeworkTask
     var mark: Mark
+    var inputMode: InputMode = .spoken
     var speech: any SpeechSynthesizing = IndianEnglishSpeech()
     var onHome: @MainActor () -> Void
     @State private var hearing: String?
@@ -19,7 +20,7 @@ struct ChildResultScreen: View {
     }
 
     private var stars: Int {
-        EnglishStars.count(for: mark)
+        EnglishStars.count(for: mark, inputMode: inputMode)
     }
 
     var body: some View {

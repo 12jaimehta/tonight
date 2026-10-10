@@ -60,6 +60,7 @@ struct ParentResultScreen: View {
     var child: ChildProfile
     var task: HomeworkTask
     var mark: Mark
+    var inputMode: InputMode = .spoken
     @Bindable var praise: PraiseDraft
     var onBack: @MainActor () -> Void
     var onToggle: @MainActor (Bool) -> Void
@@ -67,6 +68,10 @@ struct ParentResultScreen: View {
 
     private var shown: Bool {
         MarkVisibility.shownToChild(taskOverride: task.showMarkOverride, childDefault: child.showMarkToChild)
+    }
+
+    private var starCount: Int {
+        EnglishStars.count(for: mark, inputMode: inputMode)
     }
 
     var body: some View {
@@ -81,6 +86,14 @@ struct ParentResultScreen: View {
                         Text("words read correctly")
                             .font(TonightFont.parent(CGFloat(TonightType.Text.pBase)))
                             .foregroundStyle(TonightColor.pInkSoft)
+                        if inputMode == .typed {
+                            Text(ReadingAttemptLabel.typedNotReadAloud)
+                                .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .bold))
+                                .foregroundStyle(TonightColor.pWarnInk)
+                                .accessibilityIdentifier("result.typed")
+                            StarRow(filled: starCount, size: 36)
+                                .accessibilityLabel("\(starCount) of 3 stars")
+                        }
                         passage
                         legend
                         Text("Tries tonight")
@@ -104,7 +117,7 @@ struct ParentResultScreen: View {
                         .tint(TonightColor.pSuccess)
                         .accessibilityIdentifier("result.visibility")
                         Text(shown
-                             ? "On: \(child.nickname) sees \(EnglishStars.count(for: mark)) stars and '\(mark.correct) of \(mark.total)'"
+                             ? "On: \(child.nickname) sees \(starCount) stars and '\(mark.correct) of \(mark.total)'"
                              : "Off: \(child.nickname) sees 'All done!' only")
                             .font(TonightFont.parent(CGFloat(TonightType.Text.pSm)))
                             .foregroundStyle(TonightColor.pInkSoft)
@@ -413,6 +426,19 @@ struct PraiseMessageScreen: View {
         child: ProfileRules.make(nickname: "Aarav", schoolClass: "1", showMarkToChild: true, parentLabel: "Mummy"),
         task: englishTask(),
         mark: TodayCopy.sampleMark(),
+        praise: PraiseDraft(),
+        onBack: {},
+        onToggle: { _ in },
+        onSend: {}
+    )
+}
+
+#Preview("Typed reading") {
+    ParentResultScreen(
+        child: ProfileRules.make(nickname: "Aarav", schoolClass: "1", showMarkToChild: true, parentLabel: "Mummy"),
+        task: englishTask(),
+        mark: TodayCopy.sampleMark(),
+        inputMode: .typed,
         praise: PraiseDraft(),
         onBack: {},
         onToggle: { _ in },

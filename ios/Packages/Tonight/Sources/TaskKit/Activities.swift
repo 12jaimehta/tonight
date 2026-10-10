@@ -28,22 +28,30 @@ public struct ObjectiveItem: Codable, Hashable, Sendable {
     }
 }
 
+/// A reading attempt. `inputMode` is spoken or typed. Paste and OCR are not attempts.
 public struct ActivityAttempt: Hashable, Sendable {
     public var expectedText: String
     public var heardText: String
     public var written: WrittenAnswer?
     public var objective: ObjectiveItem?
+    public var inputMode: InputMode
 
     public init(
         expectedText: String = "",
         heardText: String = "",
         written: WrittenAnswer? = nil,
-        objective: ObjectiveItem? = nil
+        objective: ObjectiveItem? = nil,
+        inputMode: InputMode = .spoken
     ) {
         self.expectedText = expectedText
         self.heardText = heardText
         self.written = written
         self.objective = objective
+        self.inputMode = inputMode
+    }
+
+    public func readingSample(percent: Int?) -> ReadingSample? {
+        ReadingHistory.sample(inputMode: inputMode, percent: percent)
     }
 }
 
@@ -54,6 +62,8 @@ public protocol Activity: Sendable {
 
 public struct ReadAloudActivity: Activity {
     public let kind = V1ActivityKind.readAloud
+    /// The child read-aloud screen does not offer a keyboard.
+    public static let offersKeyboard = false
     public init() {}
 
     public func score(attempt: ActivityAttempt) -> Mark {

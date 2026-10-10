@@ -16,8 +16,22 @@ public enum EnglishStars {
         return 1
     }
 
+    /// A typed reading is practice and caps at 1. Spoken reading keeps the percent scale.
+    public static func count(percent: Int, inputMode: InputMode) -> Int {
+        switch inputMode {
+        case .spoken:
+            return count(percent: percent)
+        case .typed:
+            return 1
+        }
+    }
+
     public static func count(for mark: Mark) -> Int {
         count(percent: mark.percent ?? 0)
+    }
+
+    public static func count(for mark: Mark, inputMode: InputMode) -> Int {
+        count(percent: mark.percent ?? 0, inputMode: inputMode)
     }
 }
 
@@ -46,8 +60,13 @@ public enum AutomaticStarDisplay: Equatable, Sendable {
 
 public enum StarDisplay {
     /// Automatic stars stay hidden while the mark is hidden. A visible mark shows them immediately.
-    public static func automatic(percent: Int, markVisible: Bool, parentReviewed: Bool) -> AutomaticStarDisplay {
-        let stars = EnglishStars.count(percent: percent)
+    public static func automatic(
+        percent: Int,
+        markVisible: Bool,
+        parentReviewed: Bool,
+        inputMode: InputMode = .spoken
+    ) -> AutomaticStarDisplay {
+        let stars = EnglishStars.count(percent: percent, inputMode: inputMode)
         if markVisible {
             return .shown(stars)
         }
@@ -57,7 +76,17 @@ public enum StarDisplay {
         return .withheldHiddenMark
     }
 
-    public static func automatic(mark: Mark, markVisible: Bool, parentReviewed: Bool) -> AutomaticStarDisplay {
-        automatic(percent: mark.percent ?? 0, markVisible: markVisible, parentReviewed: parentReviewed)
+    public static func automatic(
+        mark: Mark,
+        markVisible: Bool,
+        parentReviewed: Bool,
+        inputMode: InputMode = .spoken
+    ) -> AutomaticStarDisplay {
+        automatic(
+            percent: mark.percent ?? 0,
+            markVisible: markVisible,
+            parentReviewed: parentReviewed,
+            inputMode: inputMode
+        )
     }
 }

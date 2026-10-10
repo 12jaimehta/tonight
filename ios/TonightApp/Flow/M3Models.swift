@@ -112,6 +112,7 @@ final class ReadAloudSession {
     var phase: ReadPhase
     var started = false
     var mark: Mark?
+    var inputMode: InputMode = .spoken
     var unavailableReason: String?
     var hearingWord: String?
     let micDenied: Bool
@@ -184,7 +185,12 @@ final class ReadAloudSession {
             phase = .unavailable
         case .transcript(let result):
             let activity = ReadAloudActivity()
-            mark = activity.score(attempt: ActivityAttempt(expectedText: expected, heardText: result.transcript))
+            let attempt = ActivityAttempt(
+                expectedText: expected,
+                heardText: result.transcript,
+                inputMode: inputMode
+            )
+            mark = activity.score(attempt: attempt)
             phase = .idle
         }
     }
@@ -311,4 +317,5 @@ enum GatePurpose: Equatable {
     case exitChild
     case settings
     case parentCheck
+    case enableTyping
 }
