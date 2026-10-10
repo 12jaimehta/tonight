@@ -62,6 +62,12 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(selection.maySendAudio)
     }
 
+    func test_CG09_CG15_scopeNamesMatchTheServerVocabulary() {
+        XCTAssertEqual(AudioConsentScope.onDevice.rawValue, "on_device_speech")
+        XCTAssertEqual(AudioConsentScope.server.rawValue, "server_speech")
+        XCTAssertEqual(AudioConsentRecord.currentVersion, "2026-10-09")
+    }
+
     func testCG09_staleVersionBlocksServer() {
         var granted = record(scopes: [.onDevice, .server])
         granted.version = "2020-01-01"

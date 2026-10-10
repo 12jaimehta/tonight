@@ -87,8 +87,9 @@ public enum SpeechEngineID: String, Codable, Sendable, Equatable {
 }
 
 public enum AudioConsentScope: String, Codable, Sendable, Equatable, Hashable {
-    case onDevice = "speech.on_device"
-    case server = "speech.server"
+    /// Same vocabulary as `consent_record.scopes` in the backend.
+    case onDevice = "on_device_speech"
+    case server = "server_speech"
 }
 
 public struct AudioConsentRecord: Codable, Sendable, Equatable, Identifiable {
