@@ -111,6 +111,9 @@ jobs:
           -destination '${{ steps.sim.outputs.destination }}'
           CODE_SIGNING_ALLOWED=NO
 
+      - name: Cross-check GateHarness with the independent checker
+        run: sh ios/scripts/cross_check_gate.sh
+
   app:
     name: Tonight app
     runs-on: macos-latest
@@ -281,9 +284,6 @@ jobs:
 
       - name: Check SQL migrations
         run: python3 backend/scripts/check_migrations.py
-
-      - name: Cross-check the gate harness
-        run: python3 ios/scripts/gate_harness.py
 
       - name: Parental gate wraps external links
         run: sh ios/scripts/check_parental_gate.sh
