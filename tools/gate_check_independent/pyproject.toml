@@ -1,0 +1,13 @@
+[project]
+name = "gate-check-independent"
+version = "1.0.0"
+description = "Independent GO/NO-GO check for the Tonight M0 speech-engine gate"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[project.scripts]
+gate-check-independent = "gate_check_independent.cli:console_main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
