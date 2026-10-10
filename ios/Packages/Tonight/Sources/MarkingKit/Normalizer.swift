@@ -71,10 +71,19 @@ public enum ReadingNormalizer {
     }
 
     /// Adjacent number words such as "twenty five" are one value. A hyphen is not required.
+    /// "twenty first" is the ordinal 21st, not the cardinal 20 followed by first.
     private static func mergeNumberWords(_ pieces: [Piece]) -> [String] {
         var output: [String] = []
         var index = 0
         while index < pieces.count {
+            if case .word(let head) = pieces[index],
+               index + 1 < pieces.count,
+               case .word(let tail) = pieces[index + 1],
+               let ordinal = OrdinalWords.combine(head, tail) {
+                output.append(ordinal)
+                index += 2
+                continue
+            }
             if case .word(let first) = pieces[index], NumberWords.isPart(first) {
                 var end = index
                 var bestEnd = index
@@ -114,6 +123,9 @@ public enum ReadingNormalizer {
     public static func canonicalizeWord(_ raw: String) -> String {
         let stripped = raw.unicodeScalars.filter { !isApostrophe($0) }
         let word = String(String.UnicodeScalarView(stripped))
+        if let ordinal = OrdinalWords.canonical(word) {
+            return ordinal
+        }
         if let number = numberWordValue(word) {
             return plain(number)
         }
@@ -168,23 +180,16 @@ public enum ReadingNormalizer {
         return consumeOrdinal(token, scalars: scalars, index: consumed)
     }
 
-    /// "3rd" is the ordinal 3. The suffix is not its own token.
+    /// "3rd" stays the ordinal 3rd, so it matches "third" and not the cardinal "three".
+    /// The suffix is chosen from the number. Device locale is not consulted.
     static func consumeOrdinal(_ token: String, scalars: [Unicode.Scalar], index: Int) -> (String, Int) {
-        guard !token.contains(".") else { return (token, index) }
-        let suffixes: [[Unicode.Scalar]] = [
-            Array("st".unicodeScalars),
-            Array("nd".unicodeScalars),
-            Array("rd".unicodeScalars),
-            Array("th".unicodeScalars),
-        ]
-        for suffix in suffixes {
-            let end = index + suffix.count
-            guard end <= scalars.count else { continue }
-            guard zip(suffix, scalars[index..<end]).allSatisfy({ $0 == $1 }) else { continue }
-            if end < scalars.count, isLetter(scalars[end]) || isMark(scalars[end]) { continue }
-            return (token, end)
-        }
-        return (token, index)
+        guard !token.contains("."), let value = Int(token), value > 0 else { return (token, index) }
+        let suffix = Array(OrdinalWords.suffix(for: value).unicodeScalars)
+        let end = index + suffix.count
+        guard end <= scalars.count else { return (token, index) }
+        guard zip(suffix, scalars[index..<end]).allSatisfy({ $0 == $1 }) else { return (token, index) }
+        if end < scalars.count, isLetter(scalars[end]) || isMark(scalars[end]) { return (token, index) }
+        return (token + OrdinalWords.suffix(for: value), end)
     }
 
     static func canonicalNumber(_ raw: String) -> String? {
@@ -344,6 +349,52 @@ public enum ReadingNormalizer {
 private enum Piece {
     case number(String)
     case word(String)
+}
+
+/// English ordinals for en-IN. The forms are written out here. `Locale.current` is never used.
+enum OrdinalWords {
+    static func canonical(_ raw: String) -> String? {
+        let parts = raw.replacingOccurrences(of: "-", with: " ").split(separator: " ").map(String.init)
+        if parts.count == 1 { return singles[parts[0]] }
+        if parts.count == 2 { return combine(parts[0], parts[1]) }
+        return nil
+    }
+
+    static func combine(_ head: String, _ tail: String) -> String? {
+        guard let tens = tens[head], let unit = units[tail] else { return nil }
+        let value = tens + unit
+        guard (1...31).contains(value) else { return nil }
+        return "\(value)\(suffix(for: value))"
+    }
+
+    static func suffix(for value: Int) -> String {
+        let lastTwo = value % 100
+        if (11...13).contains(lastTwo) { return "th" }
+        switch value % 10 {
+        case 1: return "st"
+        case 2: return "nd"
+        case 3: return "rd"
+        default: return "th"
+        }
+    }
+
+    private static let units: [String: Int] = [
+        "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+        "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9,
+    ]
+
+    private static let tens: [String: Int] = [
+        "twenty": 20,
+        "thirty": 30,
+    ]
+
+    private static let singles: [String: String] = [
+        "first": "1st", "second": "2nd", "third": "3rd", "fourth": "4th", "fifth": "5th",
+        "sixth": "6th", "seventh": "7th", "eighth": "8th", "ninth": "9th", "tenth": "10th",
+        "eleventh": "11th", "twelfth": "12th", "thirteenth": "13th", "fourteenth": "14th",
+        "fifteenth": "15th", "sixteenth": "16th", "seventeenth": "17th", "eighteenth": "18th",
+        "nineteenth": "19th", "twentieth": "20th", "thirtieth": "30th",
+    ]
 }
 
 enum NumberWords {
