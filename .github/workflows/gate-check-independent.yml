@@ -1,0 +1,25 @@
+name: Independent gate check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  gate-check-independent:
+    name: pytest tools/gate_check_independent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pytest
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Run independent gate tests
+        working-directory: tools/gate_check_independent
+        run: python -m pytest

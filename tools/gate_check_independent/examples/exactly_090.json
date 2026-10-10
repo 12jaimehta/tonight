@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "children": [
+    {
+      "child_id": "c1",
+      "age": 6,
+      "school_class": 1,
+      "recordings": [
+        {
+          "recording_id": "c1-passage",
+          "cells": [
+            {"reference_correct": true, "apple_correct": true, "sarvam_correct": true, "n": 19},
+            {"reference_correct": true, "apple_correct": false, "sarvam_correct": false, "n": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "child_id": "c2",
+      "age": 8,
+      "school_class": 3,
+      "recordings": [
+        {
+          "recording_id": "c2-passage",
+          "cells": [
+            {"reference_correct": true, "apple_correct": true, "sarvam_correct": true, "n": 17},
+            {"reference_correct": true, "apple_correct": false, "sarvam_correct": false, "n": 3}
+          ]
+        }
+      ]
+    }
+  ]
+}
