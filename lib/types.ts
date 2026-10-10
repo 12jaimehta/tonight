@@ -1,12 +1,10 @@
+import type { ReadingScore } from "./score";
+
 export type Attempt = {
   id: string;
   at: string;
   transcript: string;
-  correct: number;
-  total: number;
-  percent: number;
-  missed: string[];
-};
+} & ReadingScore;
 
 export type Homework = {
   id: string;

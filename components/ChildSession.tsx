@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { rememberWords, saveAttempt } from "@/lib/actions";
 import type { Attempt } from "@/lib/types";
 
@@ -24,14 +24,6 @@ type Listener = {
   stop: () => void;
 };
 
-function speak(text: string) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-IN";
-  utterance.rate = 0.9;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
-}
-
 export function ChildSession({
   id,
   instruction,
@@ -51,6 +43,33 @@ export function ChildSession({
   const [saved, setSaved] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const listenerRef = useRef<Listener | null>(null);
+  const listenGeneration = useRef(0);
+
+  function haltRecognizer(invalidate: boolean) {
+    if (invalidate) listenGeneration.current += 1;
+    const active = listenerRef.current;
+    listenerRef.current = null;
+    try {
+      active?.stop();
+    } catch {
+      // The recognizer throws if start() never succeeded.
+    }
+    setListening(false);
+  }
+
+  function speak(text: string) {
+    // Chrome shares one speech engine between synthesis and recognition.
+    // Starting playback aborts the recognizer, which then emits an empty
+    // result or the passage it just heard. Drop that session so the child's
+    // transcript and score stay put.
+    haltRecognizer(true);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-IN";
+    utterance.rate = 0.9;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }
 
   function hear() {
     speak(passage);
@@ -70,25 +89,32 @@ export function ChildSession({
       return;
     }
 
+    haltRecognizer(true);
+    const generation = ++listenGeneration.current;
     const listener = new Recognition();
     listener.lang = "en-IN";
     listener.continuous = true;
     listener.interimResults = true;
     listener.onresult = (event) => {
+      if (generation !== listenGeneration.current) return;
+      if (event.results.length === 0) return;
       let said = "";
       for (let i = 0; i < event.results.length; i++) said += event.results[i][0].transcript;
+      if (!said.trim()) return;
       setTranscript(said);
     };
-    listener.onend = () => setListening(false);
+    listener.onend = () => {
+      if (generation !== listenGeneration.current) return;
+      setListening(false);
+    };
     setListening(true);
     setError("");
+    listenerRef.current = listener;
     listener.start();
-    (window as Window & { __listener?: Listener }).__listener = listener;
   }
 
   function stop() {
-    (window as Window & { __listener?: Listener }).__listener?.stop();
-    setListening(false);
+    haltRecognizer(false);
   }
 
   async function mark() {
@@ -171,12 +197,33 @@ export function ChildSession({
             <p className="text-[15px] leading-6">Saved. Your parent can see the mark.</p>
           )}
 
+          {showMarksToChild && attempt.words.length > 0 && (
+            <p className="text-sm leading-6" aria-label="Word by word">
+              {attempt.words.map((word, index) => {
+                const label = word.status === "extra" ? word.spoken : word.expected;
+                return (
+                  <span
+                    key={index}
+                    title={word.status}
+                    className={word.status === "correct" ? undefined : "text-[var(--miss)]"}
+                  >
+                    {label}{" "}
+                  </span>
+                );
+              })}
+            </p>
+          )}
+
           {attempt.missed.length === 0 ? (
-            <p className="text-sm">Every word was there.</p>
+            <p className="text-sm">
+              {attempt.extras.length === 0
+                ? "Every word was there."
+                : `Every passage word was there. Also heard: ${attempt.extras.join(", ")}.`}
+            </p>
           ) : (
             <ul className="space-y-2">
-              {attempt.missed.map((word) => (
-                <li key={word} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2">
+              {attempt.missed.map((word, index) => (
+                <li key={`${word}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2">
                   <span>{word}</span>
                   <span className="flex gap-2 text-sm">
                     <button type="button" onClick={() => speak(word)} className="text-[var(--green)]">
@@ -204,6 +251,9 @@ export function ChildSession({
                 </li>
               ))}
             </ul>
+          )}
+          {attempt.missed.length > 0 && attempt.extras.length > 0 && (
+            <p className="text-sm">Also heard: {attempt.extras.join(", ")}</p>
           )}
         </section>
       )}
