@@ -1,3 +1,4 @@
+import AuthKit
 import DesignSystem
 import PaywallKit
 import ProfilesKit
@@ -6,6 +7,7 @@ import SwiftUI
 
 struct RootView: View {
     var consentCenter: ConsentCenter
+    var emailOTP: EmailOTPClient?
     @Environment(\.scenePhase) private var scenePhase
     @State private var gate = ParentalGateSession(lockoutRecord: ParentalGateLockout.load(from: .standard))
     @State private var showingParent = false
@@ -28,7 +30,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if showingParent && unlocked {
-                ParentAreaView()
+                ParentAreaView(emailOTP: emailOTP)
             } else if showingParent {
                 GateView(
                     challenge: challenge,
@@ -183,12 +185,20 @@ struct GateView: View {
 }
 
 struct ParentAreaView: View {
+    var emailOTP: EmailOTPClient?
+    @State private var showingSignIn = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Parent area")
                 .font(.largeTitle)
                 .accessibilityIdentifier("parent.area")
-            Text("Adult consent is a stub until the consent screen is designed.")
+            if showingSignIn, let emailOTP {
+                EmailSignInView(client: emailOTP)
+            } else if emailOTP != nil {
+                Button("Continue with email") { showingSignIn = true }
+                    .accessibilityIdentifier("signin.email")
+            }
             Text(TonightComposition.speechFlags.sarvamEnabled ? "Server speech is on." : "Server speech is off.")
             Text(PaywallAccess.canPresent(flag: PaywallFlags(), parentUnlocked: true) ? "Purchases are on." : "Purchases are off.")
         }

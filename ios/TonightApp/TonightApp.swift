@@ -1,3 +1,4 @@
+import AuthKit
 import Persistence
 import SpeechKit
 import SwiftData
@@ -14,7 +15,7 @@ struct TonightApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(consentCenter: consentCenter)
+            RootView(consentCenter: consentCenter, emailOTP: TonightComposition.makeEmailOTP())
         }
     }
 }
@@ -45,6 +46,16 @@ enum TonightComposition {
             eraser: IgnoringChildEraser(),
             sender: FailingDeletionSender()
         )) ?? ConsentCenter(ledger: try! SpeechLedger(directory: directory), eraser: IgnoringChildEraser(), sender: FailingDeletionSender())
+    }
+
+    static func makeEmailOTP() -> EmailOTPClient? {
+        guard let config = SupabaseAuthConfig.load(from: .main) else { return nil }
+        return EmailOTPClient(
+            config: config,
+            transport: URLSessionOTPTransport(),
+            sessions: KeychainSessionStore(),
+            tokens: KeychainAccessTokenStore()
+        )
     }
 
     private static func deletionSender() -> any DeletionSending {
