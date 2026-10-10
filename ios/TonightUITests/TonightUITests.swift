@@ -183,6 +183,19 @@ final class TonightUITests: XCTestCase {
         XCTAssertFalse(withdraw.contains("consentCenter.grant"))
     }
 
+    func test_P1_13_withdrawalClearsRememberMarksAndAudio() {
+        let app = launch(screen: "child", extra: ["-TonightSeedLocalData"])
+        app.buttons["child.lock"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
+        app.buttons["today.settings"].tap()
+        tapDigits(["3", "4", "7"], in: app)
+        XCTAssertTrue(app.staticTexts["remember 1 marks 1 audio 1"].waitForExistence(timeout: 5))
+        app.buttons["consent.withdraw"].tap()
+        app.buttons["consent.withdraw.confirm"].tap()
+        XCTAssertTrue(app.staticTexts["remember 0 marks 0 audio 0"].waitForExistence(timeout: 5))
+    }
+
     func test_CG32_withdrawConsentConfirmsBehindTheGate() {
         let app = launch(screen: "child", extra: ["-TonightSeedConsent"])
         app.buttons["child.lock"].tap()

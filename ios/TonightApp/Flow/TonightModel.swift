@@ -425,6 +425,7 @@ final class TonightModel {
     var confirmingWithdrawal = false
     var withdrawalNotice = ""
     var withdrawalHasConsent = false
+    var withdrawalLocal = ""
     var withdrawalEpoch = 0
     let consentStore = InMemoryAdultConsentStore()
     let consentCenter: ConsentCenter?
@@ -478,9 +479,27 @@ final class TonightModel {
         case .signIn, .consent, .addChild, .addPage, .checkWords, .review, .readAloud, .childResult, .notebook, .parentChecksChild, .parentResult, .parentCheck, .praise:
             break
         }
-        if arguments.contains("-TonightSeedConsent") {
+        if arguments.contains("-TonightSeedConsent") || arguments.contains("-TonightSeedLocalData") {
             seedLocalConsent()
         }
+        if arguments.contains("-TonightSeedLocalData") {
+            seedLocalChildData()
+        }
+    }
+
+    private func seedLocalChildData() {
+        guard let child, let consentCenter else { return }
+        try? consentCenter.ledger.addRememberWord("kite", childProfileID: child.id)
+        try? consentCenter.ledger.addMarkCorrection("star", childProfileID: child.id)
+        _ = try? consentCenter.ledger.storeAudio(Data([1, 2, 3]), childProfileID: child.id, serverPath: false)
+    }
+
+    private func localInventory(_ childID: UUID) -> String {
+        guard let consentCenter else { return "remember 0 marks 0 audio 0" }
+        let words = consentCenter.ledger.rememberWords(childProfileID: childID).count
+        let marks = consentCenter.ledger.markCorrections(childProfileID: childID).count
+        let audio = consentCenter.ledger.liveArtefacts(childProfileID: childID).count
+        return "remember \(words) marks \(marks) audio \(audio)"
     }
 
     private func seedLocalConsent() {
@@ -698,6 +717,7 @@ final class TonightModel {
                 withdrawalNotice = ""
                 let childID = child?.id ?? today.selected?.id
                 withdrawalHasConsent = childID.flatMap { consentCenter?.record(for: $0) } != nil
+                withdrawalLocal = childID.map(localInventory) ?? ""
                 showingWithdrawal = true
             case .parentCheck:
                 route = .parentCheck
@@ -746,6 +766,7 @@ final class TonightModel {
             let consentID = existing?.id
             _ = try await consentCenter.withdraw(childProfileID: childID, at: Date())
             await serverWithdrawal?.submit(childID: childID, consentRecordID: consentID)
+            withdrawalLocal = localInventory(childID)
             withdrawalNotice = "Consent withdrawn"
             confirmingWithdrawal = false
             withdrawalEpoch += 1

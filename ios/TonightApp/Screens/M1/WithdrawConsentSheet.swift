@@ -6,6 +6,7 @@ struct WithdrawConsentSheet: View {
     var confirming: Bool
     var notice: String
     var hasConsent: Bool = true
+    var localInventory: String = ""
     var onAsk: @MainActor () -> Void
     var onConfirm: @MainActor () -> Void
     var onCancel: @MainActor () -> Void
@@ -20,6 +21,12 @@ struct WithdrawConsentSheet: View {
                 Text("This clears the consent record for this child and queues deletion of their data.")
                     .font(TonightFont.parent(CGFloat(TonightType.Text.pBase)))
                     .foregroundStyle(TonightColor.pInkSoft)
+                if !localInventory.isEmpty {
+                    Text(localInventory)
+                        .font(TonightFont.parent(CGFloat(TonightType.Text.pBase)))
+                        .foregroundStyle(TonightColor.pInkSoft)
+                        .accessibilityIdentifier("withdrawal.local")
+                }
                 if !hasConsent {
                     Text(notice.isEmpty ? "No consent on file" : notice)
                         .font(TonightFont.parent(CGFloat(TonightType.Text.pBase), weight: .semibold))
