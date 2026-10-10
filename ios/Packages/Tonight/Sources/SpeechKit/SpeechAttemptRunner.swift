@@ -29,6 +29,13 @@ public struct ProxyResponse: Sendable, Equatable {
     }
 }
 
+public enum ProxyTransportError: Error, Equatable, Sendable {
+    case serverError(status: Int, bytesSent: Int)
+    case timeout(bytesSent: Int)
+    case cancelled(bytesSent: Int)
+    case emptyTranscript(bytesSent: Int)
+}
+
 public protocol ProxyTransporting: Sendable {
     func post(_ request: ProxyRequest) async throws -> ProxyResponse
     func cancelAll() async
@@ -293,15 +300,28 @@ public struct SpeechAttemptRunner: Sendable {
             timeout: OnDeviceRequestPolicy.serverTimeout
         )
         let post = Task { try await transport.post(request) }
+        let timedOut = OSAllocatedUnfairLock(initialState: false)
         let timeout = Task {
             try await sleeper.sleep(seconds: OnDeviceRequestPolicy.serverTimeout)
+            timedOut.withLock { $0 = true }
             post.cancel()
             await transport.cancelAll()
         }
         let result = await post.result
         timeout.cancel()
+        let expired = timedOut.withLock { $0 }
         switch result {
         case .success(let response):
+            guard !response.transcript.isEmpty else {
+                return await fallbackOnDevice(
+                    audio: audio,
+                    input: input,
+                    attemptID: attemptID,
+                    locale: locale,
+                    reason: .serverError,
+                    bytesSent: body.count
+                )
+            }
             callLogs.append(SpeechCallLog(engineID: .sarvam, latency: response.latency, cost: response.cost, byteCount: body.count))
             audit(selection, input: input, attemptID: attemptID, bytes: body.count, cancelled: nil)
             return SpeechAttemptOutcome(
@@ -310,17 +330,42 @@ public struct SpeechAttemptRunner: Sendable {
                 words: response.words,
                 bytesSent: body.count
             )
-        case .failure:
+        case .failure(let error):
+            let mapped = Self.mapTransportError(error, fallbackBytes: body.count, timedOut: expired)
             return await fallbackOnDevice(
                 audio: audio,
                 input: input,
                 attemptID: attemptID,
                 locale: locale,
-                reason: .timeout,
-                bytesSent: 0,
-                cancelledAfterBytes: body.count
+                reason: mapped.reason,
+                bytesSent: mapped.bytesSent,
+                cancelledAfterBytes: mapped.bytesSent
             )
         }
+    }
+
+    private static func mapTransportError(_ error: Error, fallbackBytes: Int, timedOut: Bool) -> (reason: SelectionReason, bytesSent: Int) {
+        if let transport = error as? ProxyTransportError {
+            switch transport {
+            case .serverError(_, let bytesSent), .emptyTranscript(let bytesSent):
+                return (.serverError, bytesSent)
+            case .timeout(let bytesSent):
+                return (.timeout, bytesSent)
+            case .cancelled(let bytesSent):
+                return (timedOut ? .timeout : .cancelled, bytesSent)
+            }
+        }
+        if timedOut || error is CancellationError {
+            return (.timeout, fallbackBytes)
+        }
+        let urlError = error as? URLError
+        if urlError?.code == .timedOut {
+            return (.timeout, fallbackBytes)
+        }
+        if urlError?.code == .cancelled {
+            return (.cancelled, fallbackBytes)
+        }
+        return (.timeout, fallbackBytes)
     }
 
     private func fallbackOnDevice(
@@ -450,6 +495,18 @@ public final class AllowlistSessionDelegate: NSObject, URLSessionTaskDelegate, @
         }
         completionHandler(nil)
     }
+
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        self.bytesSent.withLock { $0 = totalBytesSent }
+    }
+
+    let bytesSent = OSAllocatedUnfairLock(initialState: Int64(0))
 }
 
 public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Sendable {
@@ -479,8 +536,28 @@ public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Senda
         urlRequest.httpMethod = "POST"
         urlRequest.httpBody = request.body
         request.headers.forEach { urlRequest.setValue($1, forHTTPHeaderField: $0) }
-        let (data, _) = try await session.data(for: urlRequest)
-        return try Self.decode(data)
+        let sentBefore = redirectDelegate?.bytesSent.withLock { $0 } ?? 0
+        do {
+            let (data, response) = try await session.data(for: urlRequest)
+            let sent = Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200 else {
+                throw ProxyTransportError.serverError(status: status, bytesSent: sent)
+            }
+            let decoded = try Self.decode(data)
+            guard !decoded.transcript.isEmpty else {
+                throw ProxyTransportError.emptyTranscript(bytesSent: sent)
+            }
+            return decoded
+        } catch let error as ProxyTransportError {
+            throw error
+        } catch let error as URLError where error.code == .timedOut {
+            throw ProxyTransportError.timeout(bytesSent: Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore))
+        } catch let error as URLError where error.code == .cancelled {
+            throw ProxyTransportError.cancelled(bytesSent: Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore))
+        } catch is CancellationError {
+            throw ProxyTransportError.cancelled(bytesSent: Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore))
+        }
     }
 
     public func cancelAll() async {
