@@ -242,6 +242,8 @@ final class GateHarnessTests: XCTestCase {
             return "DECIDED"
         } catch let error as GateHarnessError {
             return error.code
+        } catch {
+            return "THREW"
         }
     }
 
@@ -255,6 +257,8 @@ final class GateHarnessTests: XCTestCase {
             return "DECIDED"
         } catch let error as GateHarnessError {
             return error.code
+        } catch {
+            return "THREW"
         }
     }
 
