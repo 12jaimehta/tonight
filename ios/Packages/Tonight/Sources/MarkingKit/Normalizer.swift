@@ -13,13 +13,13 @@ public enum ReadingNormalizer {
     public static func tokens(in text: String) -> [String] {
         let folded = text.precomposedStringWithCompatibilityMapping.lowercased()
         let scalars = Array(folded.unicodeScalars)
-        var tokens: [String] = []
+        var pieces: [Piece] = []
         var word = ""
         var index = 0
 
         func flushWord() {
             guard !word.isEmpty else { return }
-            tokens.append(canonicalizeWord(word))
+            pieces.append(.word(word))
             word = ""
         }
 
@@ -38,7 +38,7 @@ public enum ReadingNormalizer {
                 }
                 flushWord()
                 let (token, next) = consumeNumber(scalars, from: index)
-                tokens.append(token)
+                pieces.append(.number(token))
                 index = next
                 continue
             }
@@ -67,7 +67,45 @@ public enum ReadingNormalizer {
             index += 1
         }
         flushWord()
-        return tokens
+        return mergeNumberWords(pieces)
+    }
+
+    /// Adjacent number words such as "twenty five" are one value. A hyphen is not required.
+    static func mergeNumberWords(_ pieces: [Piece]) -> [String] {
+        var output: [String] = []
+        var index = 0
+        while index < pieces.count {
+            if case .word(let first) = pieces[index], NumberWords.isPart(first) {
+                var end = index
+                var bestEnd = index
+                var best: Decimal?
+                while end < pieces.count {
+                    guard case .word(let part) = pieces[end], NumberWords.isPart(part) else { break }
+                    end += 1
+                    let phrase = pieces[index..<end].compactMap { piece -> String? in
+                        if case .word(let word) = piece { return word }
+                        return nil
+                    }.joined(separator: " ")
+                    if let value = NumberWords.parse(phrase) {
+                        bestEnd = end
+                        best = value
+                    }
+                }
+                if let best {
+                    output.append(plain(best))
+                    index = bestEnd
+                    continue
+                }
+            }
+            switch pieces[index] {
+            case .number(let number):
+                output.append(number)
+            case .word(let word):
+                output.append(canonicalizeWord(word))
+            }
+            index += 1
+        }
+        return output
     }
 
     /// Idempotent on its own output: tokenising the joined tokens again is stable
@@ -86,29 +124,66 @@ public enum ReadingNormalizer {
         var raw = ""
         while index < scalars.count {
             let scalar = scalars[index]
-            if isDigit(scalar) || scalar == "," || scalar == "." {
+            if isDigit(scalar) || scalar == "," {
                 raw.unicodeScalars.append(scalar)
                 index += 1
-            } else if isIgnorable(scalar) {
-                index += 1
-            } else {
+                continue
+            }
+            // A dot is a decimal point only when a digit follows. "3.5." keeps the sentence period.
+            if scalar == "." {
+                let next = index + 1
+                if next < scalars.count, isDigit(scalars[next]) {
+                    raw.unicodeScalars.append(scalar)
+                    index += 1
+                    continue
+                }
                 break
             }
-        }
-        if let canonical = canonicalNumber(raw) {
-            return (canonical, index)
-        }
-        // Malformed grouping: keep only the leading digits and rescan the rest.
-        var digits = ""
-        var consumed = start
-        while consumed < scalars.count, isDigit(scalars[consumed]) || isIgnorable(scalars[consumed]) {
-            if isDigit(scalars[consumed]) {
-                digits.unicodeScalars.append(asciiDigit(scalars[consumed]))
+            if isIgnorable(scalar) {
+                index += 1
+                continue
             }
-            consumed += 1
+            break
         }
-        if consumed == start { consumed += 1 }
-        return (digits.isEmpty ? raw : plainIntegerDigits(digits), consumed)
+        let token: String
+        let consumed: Int
+        if let canonical = canonicalNumber(raw), !raw.isEmpty {
+            token = canonical
+            consumed = index
+        } else {
+            // Malformed grouping: keep only the leading digits and rescan the rest.
+            var digits = ""
+            var fallback = start
+            while fallback < scalars.count, isDigit(scalars[fallback]) || isIgnorable(scalars[fallback]) {
+                if isDigit(scalars[fallback]) {
+                    digits.unicodeScalars.append(asciiDigit(scalars[fallback]))
+                }
+                fallback += 1
+            }
+            if fallback == start { fallback += 1 }
+            token = digits.isEmpty ? raw : plainIntegerDigits(digits)
+            consumed = fallback
+        }
+        return consumeOrdinal(token, scalars: scalars, index: consumed)
+    }
+
+    /// "3rd" is the ordinal 3. The suffix is not its own token.
+    static func consumeOrdinal(_ token: String, scalars: [Unicode.Scalar], index: Int) -> (String, Int) {
+        guard !token.contains(".") else { return (token, index) }
+        let suffixes: [[Unicode.Scalar]] = [
+            Array("st".unicodeScalars),
+            Array("nd".unicodeScalars),
+            Array("rd".unicodeScalars),
+            Array("th".unicodeScalars),
+        ]
+        for suffix in suffixes {
+            let end = index + suffix.count
+            guard end <= scalars.count else { continue }
+            guard zip(suffix, scalars[index..<end]).allSatisfy({ $0 == $1 }) else { continue }
+            if end < scalars.count, isLetter(scalars[end]) || isMark(scalars[end]) { continue }
+            return (token, end)
+        }
+        return (token, index)
     }
 
     static func canonicalNumber(_ raw: String) -> String? {
@@ -265,7 +340,17 @@ public enum ReadingNormalizer {
     ]
 }
 
+private enum Piece {
+    case number(String)
+    case word(String)
+}
+
 enum NumberWords {
+    static func isPart(_ word: String) -> Bool {
+        if word.contains("-") { return parse(word.replacingOccurrences(of: "-", with: " ")) != nil }
+        return small[word] != nil || multipliers[word] != nil
+    }
+
     static func parse(_ text: String) -> Decimal? {
         let parts = text.split(separator: " ").map(String.init).filter { !$0.isEmpty }
         guard !parts.isEmpty else { return nil }
