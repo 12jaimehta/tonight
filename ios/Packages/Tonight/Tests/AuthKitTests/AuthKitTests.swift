@@ -118,6 +118,54 @@ final class AuthKitTests: XCTestCase {
         XCTAssertFalse(source.contains("Nothing leaves the phone"))
     }
 
+    func test_N32_refreshUsesTheRefreshTokenAndSkipsALiveToken() async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let tokens = InMemoryAccessTokenStore()
+        try tokens.save(token: "expired-token", expiresAt: now.addingTimeInterval(-10), refreshToken: "refresh-1")
+        let transport = ScriptedOTPTransport()
+        transport.next = (
+            Data("""
+            {"access_token":"fresh-token","expires_in":3600,"refresh_token":"refresh-2","user":{"id":"parent-1"}}
+            """.utf8),
+            200
+        )
+        let client = EmailOTPClient(
+            config: SupabaseAuthConfig(baseURL: URL(string: "https://project-ref.supabase.co")!, anonKey: "anon-test"),
+            transport: transport,
+            sessions: InMemorySessionStore(),
+            tokens: tokens,
+            now: { now }
+        )
+        let fresh = try await client.refreshSession()
+        XCTAssertEqual(fresh, "fresh-token")
+        XCTAssertEqual(try tokens.load(), "fresh-token")
+        XCTAssertEqual(try tokens.loadRefreshToken(), "refresh-2")
+        XCTAssertEqual(transport.requests.count, 1)
+        XCTAssertEqual(transport.requests[0].url?.path, "/auth/v1/token")
+        XCTAssertEqual(transport.requests[0].url?.query, "grant_type=refresh_token")
+        let body = try JSONSerialization.jsonObject(with: transport.requests[0].httpBody ?? Data()) as? [String: Any]
+        XCTAssertEqual(body?["refresh_token"] as? String, "refresh-1")
+        XCTAssertEqual(transport.requests[0].value(forHTTPHeaderField: "api" + "key"), "anon-test")
+
+        let again = try await client.refreshSession()
+        XCTAssertEqual(again, "fresh-token")
+        XCTAssertEqual(transport.requests.count, 1)
+    }
+
+    func test_N32_foregroundRetriesTheWithdrawalQueue() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let view = try String(contentsOf: root.appendingPathComponent("TonightApp/RootView.swift"), encoding: .utf8)
+        let model = try String(contentsOf: root.appendingPathComponent("TonightApp/Flow/TonightModel.swift"), encoding: .utf8)
+        XCTAssertTrue(view.contains("await model.refreshWithdrawalQueue()"))
+        XCTAssertTrue(model.contains("emailOTP.refreshSession()"))
+        XCTAssertTrue(model.contains("serverWithdrawal?.flush()"))
+    }
+
     func testAdultConsentIsStoredInMemory() {
         let store = InMemoryAdultConsentStore()
         XCTAssertNil(store.current())

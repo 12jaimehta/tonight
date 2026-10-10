@@ -210,7 +210,10 @@ struct RootView: View {
             Task { await speechScene.apply(session.watch) }
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase != .active else { return }
+            if phase == .active {
+                Task { await model.refreshWithdrawalQueue() }
+                return
+            }
             if stubUpload { uploadStatus = "Suspended" }
             model.speech.stop()
             Task { await speechScene.sceneDidChange(isActive: false) }
