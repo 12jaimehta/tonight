@@ -5,6 +5,11 @@ final class SpeechEngineTests: XCTestCase {
     private let child = UUID()
     private let otherChild = UUID()
 
+    override func setUp() {
+        super.setUp()
+        installPlaceholderSpeechConfig()
+    }
+
     func testCG01_noConsent_doesNotRecord() {
         let selection = SpeechEngineSelector.select(input(record: nil))
         XCTAssertEqual(selection.engine, .none)
@@ -127,8 +132,7 @@ final class SpeechEngineTests: XCTestCase {
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(urls.count, 1)
-        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
+        XCTAssertEqual(urls, [])
     }
 
     func testAudioStorageIsMemoryOnly() {

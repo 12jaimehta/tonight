@@ -2,7 +2,7 @@
 
 Supabase in Mumbai, region `ap-south-1`. This project has not been created. The notes below are the setup to apply when it is.
 
-Placeholder project URL: `https://project-ref.supabase.co`. The label `project-ref` stands in for the real project ref.
+Placeholder project URL: `https://project-ref.supabase.co`. The label `project-ref` stands in for the real project ref. The app reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the build configuration (`ios/Config`), not from a Swift literal. Copy `Config.example.xcconfig` to `Local.xcconfig` for a real project. `Local.xcconfig` is gitignored.
 
 ## Auth
 

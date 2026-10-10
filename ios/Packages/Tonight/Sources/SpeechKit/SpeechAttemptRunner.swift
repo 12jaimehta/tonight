@@ -300,13 +300,14 @@ public struct SpeechAttemptRunner: Sendable {
             return await fallbackOnDevice(audio: audio, input: input, attemptID: attemptID, locale: locale, reason: .serverError, bytesSent: 0)
         }
         let body = SarvamRequestBody.encode(audio: audio, locale: locale, consent: record)
+        let anonKey = authorization.anonKey.isEmpty ? TonightEndpoints.anonKey : authorization.anonKey
         let request = ProxyRequest(
             url: url,
             body: body,
             headers: [
                 "Content-Type": "application/json",
                 "Authorization": "Bearer \(authorization.accessToken)",
-                "apikey": authorization.anonKey,
+                "apikey": anonKey,
             ],
             timeout: OnDeviceRequestPolicy.serverTimeout
         )

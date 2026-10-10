@@ -5,6 +5,11 @@ final class SpeechPolicyTests: XCTestCase {
     private let child = UUID()
     private let otherChild = UUID()
 
+    override func setUp() {
+        super.setUp()
+        installPlaceholderSpeechConfig()
+    }
+
     func testCG01_noConsent_doesNotRecord() {
         let selection = SpeechEngineSelector.select(input(record: nil))
         XCTAssertEqual(selection.engine, .none)
@@ -163,8 +168,13 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(urls.count, 1)
-        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
+        XCTAssertEqual(urls, [])
+    }
+
+    func testSpeechConfigIsInjectedInsteadOfTheAppBundle() {
+        XCTAssertNil(SupabaseSpeechConfig.load(from: Bundle(for: SpeechPolicyTests.self)))
+        XCTAssertEqual(TonightEndpoints.proxyBaseURL.host, "project-ref.supabase.co")
+        XCTAssertEqual(TonightEndpoints.anonKey, "test-anon-key")
     }
 
     func testForegroundSessionIsNotABackgroundSession() {
@@ -300,7 +310,7 @@ final class SpeechPolicyTests: XCTestCase {
             transport: transport,
             onDevice: onDevice,
             sleeper: sleeper,
-            authorization: SpeechRequestAuthorization(accessToken: "parent-session-token", anonKey: "test-anon-key")
+            authorization: SpeechRequestAuthorization(accessToken: "parent-session-token", anonKey: "")
         )
     }
 
@@ -389,6 +399,13 @@ struct NeverSleeper: SpeechSleeper {
     func sleep(seconds: TimeInterval) async throws {
         try await Task.sleep(nanoseconds: 30_000_000_000)
     }
+}
+
+func installPlaceholderSpeechConfig() {
+    TonightEndpoints.use(SupabaseSpeechConfig(
+        baseURL: URL(string: "https://project-ref.supabase.co")!,
+        anonKey: "test-anon-key"
+    ))
 }
 
 private func assertNoVendorSecret(in text: String, file: StaticString = #filePath, line: UInt = #line) {
