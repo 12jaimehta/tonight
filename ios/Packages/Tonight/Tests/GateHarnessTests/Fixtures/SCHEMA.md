@@ -6,7 +6,7 @@ This is the M0 results file from the independent checker README. Rates in a resu
 
 A cell is one pattern of the booleans plus a non-negative integer `n`. `reference_correct` may be `null` for an unjudged word. Duplicate judged patterns in one recording are added together. A word object is one judged or unjudged token. Both engines are judged on the same tokens.
 
-`apple_correct` or `sarvam_correct` may be missing or `null` when that engine has no result. That word is not correct and not incorrect, and it is left out of the counts. A recording that then has no word judged by both engines is `UNPAIRED_RECORDING`. That is an input error. The study is not scored, so the recording does not pass or fail the study by itself.
+`apple_correct` or `sarvam_correct` may be missing or `null` when that engine has no result. That word is not correct and not incorrect. It is not dropped so the rest of the recording can be scored. A recording that contains such a word, or that has no word judged by both engines, is `UNPAIRED_RECORDING`. That is an input error. The study is not scored, so the recording does not pass or fail the study by itself. A null `reference_correct` with both engine calls present is still an unjudged word and stays out of the counts.
 
 ```json
 {

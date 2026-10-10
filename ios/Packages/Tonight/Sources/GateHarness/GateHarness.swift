@@ -385,13 +385,13 @@ private func parseRecording(
     if hasCells == hasWords {
         throw GateHarnessError.invalidInput("\(path) must contain exactly one of 'cells' or 'words'")
     }
-    let parsed: (counts: [JudgedPattern: Int], sawPair: Bool)
+    let parsed: (counts: [JudgedPattern: Int], sawPair: Bool, sawUnpaired: Bool)
     if hasCells {
         parsed = try countsFromCells(body["cells"], path: "\(path).cells")
     } else {
         parsed = try countsFromWords(body["words"], path: "\(path).words")
     }
-    if !parsed.sawPair {
+    if !parsed.sawPair || parsed.sawUnpaired {
         throw GateHarnessError.unpairedRecording("recording \(recordingID) has no matching pair")
     }
     return try totals(recordingID: recordingID, childID: childID, counts: parsed.counts, path: path)
@@ -403,45 +403,53 @@ private struct JudgedPattern: Hashable {
     var sarvamCorrect: Bool
 }
 
-private func countsFromCells(_ raw: Any?, path: String) throws -> (counts: [JudgedPattern: Int], sawPair: Bool) {
+private func countsFromCells(_ raw: Any?, path: String) throws -> (counts: [JudgedPattern: Int], sawPair: Bool, sawUnpaired: Bool) {
     guard let items = raw as? [Any], !items.isEmpty else {
         throw GateHarnessError.invalidInput("\(path) must be a non-empty list")
     }
     var counts: [JudgedPattern: Int] = [:]
     var sawPair = false
+    var sawUnpaired = false
     for (index, item) in items.enumerated() {
         guard let cell = item as? [String: Any] else {
             throw GateHarnessError.invalidInput("\(path)[\(index)] must be a JSON object")
         }
         let judged = try judgedPattern(cell, path: "\(path)[\(index)]")
         let count = try nonNegativeInteger(cell["n"], path: "\(path)[\(index)].n")
-        if !judged.paired { continue }
+        if !judged.paired {
+            sawUnpaired = true
+            continue
+        }
         sawPair = true
         if let pattern = judged.pattern {
             counts[pattern, default: 0] += count
         }
     }
-    return (counts, sawPair)
+    return (counts, sawPair, sawUnpaired)
 }
 
-private func countsFromWords(_ raw: Any?, path: String) throws -> (counts: [JudgedPattern: Int], sawPair: Bool) {
+private func countsFromWords(_ raw: Any?, path: String) throws -> (counts: [JudgedPattern: Int], sawPair: Bool, sawUnpaired: Bool) {
     guard let items = raw as? [Any], !items.isEmpty else {
         throw GateHarnessError.invalidInput("\(path) must be a non-empty list")
     }
     var counts: [JudgedPattern: Int] = [:]
     var sawPair = false
+    var sawUnpaired = false
     for (index, item) in items.enumerated() {
         guard let word = item as? [String: Any] else {
             throw GateHarnessError.invalidInput("\(path)[\(index)] must be a JSON object")
         }
         let judged = try judgedPattern(word, path: "\(path)[\(index)]")
-        if !judged.paired { continue }
+        if !judged.paired {
+            sawUnpaired = true
+            continue
+        }
         sawPair = true
         if let pattern = judged.pattern {
             counts[pattern, default: 0] += 1
         }
     }
-    return (counts, sawPair)
+    return (counts, sawPair, sawUnpaired)
 }
 
 /// A missing or null engine call is not a pair. The word is left out of the counts.

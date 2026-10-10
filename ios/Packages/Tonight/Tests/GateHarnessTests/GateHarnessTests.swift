@@ -39,43 +39,31 @@ final class GateHarnessTests: XCTestCase {
         }
     }
 
-    func test_MET28_missingAppleCorrectIsExcluded() throws {
+    func test_MET28_missingAppleCorrectIsExcluded() {
         var cells = passingCells()
         cells.append([
             "reference_correct": true,
             "sarvam_correct": true,
             "n": 7,
         ])
-        let report = try evaluate(study([
+        XCTAssertEqual(code(of: study([
             child("c1", age: 7, schoolClass: 2, cells: cells),
-        ]))
-        XCTAssertEqual(report.decision, .apple)
-        XCTAssertEqual(report.apple.words, 100)
-        XCTAssertEqual(report.sarvam.words, 100)
-        XCTAssertEqual(report.apple.falseRejects, 0)
-        XCTAssertEqual(report.apple.falseAccepts, 0)
-        XCTAssertEqual(report.sarvam.falseRejects, 0)
-        XCTAssertEqual(report.sarvam.falseAccepts, 0)
+        ])), "UNPAIRED_RECORDING")
     }
 
-    func test_MET28_missingSarvamCorrectIsExcluded() throws {
+    func test_MET28_missingSarvamCorrectIsExcluded() {
         var cells = passingCells()
         cells.append([
             "reference_correct": false,
             "apple_correct": true,
             "n": 3,
         ])
-        let report = try evaluate(study([
+        XCTAssertEqual(code(of: study([
             child("c1", age: 7, schoolClass: 2, cells: cells),
-        ]))
-        XCTAssertEqual(report.decision, .apple)
-        XCTAssertEqual(report.apple.words, 100)
-        XCTAssertEqual(report.apple.falseAccepts, 0)
-        XCTAssertEqual(report.sarvam.words, 100)
-        XCTAssertEqual(report.sarvam.falseAccepts, 0)
+        ])), "UNPAIRED_RECORDING")
     }
 
-    func test_MET28_nullEngineCallIsExcluded() throws {
+    func test_MET28_nullEngineCallIsExcluded() {
         var cells = passingCells()
         cells.append([
             "reference_correct": true,
@@ -83,14 +71,25 @@ final class GateHarnessTests: XCTestCase {
             "sarvam_correct": false,
             "n": 4,
         ])
-        let report = try evaluate(study([
+        XCTAssertEqual(code(of: study([
             child("c1", age: 7, schoolClass: 2, cells: cells),
-        ]))
-        XCTAssertEqual(report.decision, .apple)
-        XCTAssertEqual(report.apple.words, 100)
-        XCTAssertEqual(report.apple.falseRejects, 0)
-        XCTAssertEqual(report.sarvam.words, 100)
-        XCTAssertEqual(report.sarvam.falseRejects, 0)
+        ])), "UNPAIRED_RECORDING")
+    }
+
+    func test_N31_G33_wordsWithoutSarvamDoNotScoreAsApple() {
+        let cells: [[String: Any]] = [
+            cell(true, false, false, 1),
+            cell(true, true, true, 94),
+            cell(false, false, false, 5),
+            [
+                "reference_correct": true,
+                "apple_correct": true,
+                "n": 3,
+            ],
+        ]
+        XCTAssertEqual(code(of: study([
+            child("c00", age: 7, schoolClass: 2, cells: cells),
+        ])), "UNPAIRED_RECORDING")
     }
 
     func test_MET28_recordingBecomesUnpairedAfterDroppedWords() throws {
