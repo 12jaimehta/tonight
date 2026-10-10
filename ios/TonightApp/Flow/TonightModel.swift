@@ -311,22 +311,33 @@ final class SubjectsEditor {
 final class GateModel {
     static let digitCount = ParentalGateBank.digitCount
 
-    var session = ParentalGateSession()
+    var session: ParentalGateSession
     var answer = ""
     var offset = 0
     var notice = ""
     var presented = false
     let fixed: Bool
+    private let defaults: UserDefaults
+    private(set) var challenge: GateChallenge
 
-    init(fixed: Bool) {
+    init(fixed: Bool, defaults: UserDefaults = .standard) {
         self.fixed = fixed
-    }
-
-    var challenge: GateChallenge {
-        ParentalGateBank.challenge(fixed: fixed, offset: offset)
+        self.defaults = defaults
+        session = ParentalGateSession(lockoutRecord: ParentalGateLockout.load(from: defaults))
+        challenge = ParentalGateBank.challenge(fixed: fixed, offset: 0)
     }
 
     var isLocked: Bool { session.isLocked(at: Date()) }
+
+    /// Each presentation of the real gate draws a new spelled number. The fixed UI-test gate stays on 347.
+    func preparePresentation() {
+        if fixed {
+            challenge = ParentalGateBank.challenge(fixed: true)
+            return
+        }
+        var generator = SystemRandomNumberGenerator()
+        challenge = ParentalGateBank.randomChallenge(using: &generator)
+    }
 
     func press(_ key: String) -> GateVerdict? {
         if isLocked {
@@ -346,6 +357,7 @@ final class GateModel {
 
     func submit() -> GateVerdict {
         let verdict = session.submit(answer: answer, to: challenge, now: Date())
+        session.lockoutRecord.save(to: defaults)
         switch verdict {
         case .unlocked:
             notice = ""
@@ -353,7 +365,10 @@ final class GateModel {
         case .incorrect:
             notice = "Let's try a different one."
             answer = ""
-            if !fixed { offset += 1 }
+            if !fixed {
+                offset += 1
+                challenge = ParentalGateBank.challenge(fixed: false, offset: offset)
+            }
         case .locked:
             notice = ""
             answer = ""
@@ -363,10 +378,10 @@ final class GateModel {
 
     func resetForBackground() {
         session.resetForBackground()
+        session.lockoutRecord.save(to: defaults)
         answer = ""
         notice = ""
         presented = false
-        offset = 0
     }
 
     static func preview(answer: String) -> GateModel {
@@ -627,6 +642,7 @@ final class TonightModel {
             gate.presented = false
             return
         }
+        gate.preparePresentation()
         gate.presented = true
     }
 

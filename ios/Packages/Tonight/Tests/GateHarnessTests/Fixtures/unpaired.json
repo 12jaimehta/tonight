@@ -1,0 +1,14 @@
+{
+  "cohort": [
+    "c00"
+  ],
+  "recordings": [
+    {
+      "id": "c00-0",
+      "childID": "c00",
+      "referenceCorrect": true,
+      "appleCorrect": true,
+      "sarvamCorrect": null
+    }
+  ]
+}

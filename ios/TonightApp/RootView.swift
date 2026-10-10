@@ -1,9 +1,18 @@
 import DesignSystem
+import SpeechKit
 import SwiftUI
 
 struct RootView: View {
+    var consentCenter: ConsentCenter
     @Environment(\.scenePhase) private var scenePhase
     @State private var model = TonightComposition.makeModel()
+    @State private var uploadStatus = ""
+    @State private var speechScene = SpeechSceneController(runner: TonightSpeechScene.makeRunner())
+    @State private var speechSession = SpeechSessionModel(flagOn: TonightComposition.speechFlags.sarvamEnabled)
+
+    private var stubUpload: Bool {
+        ProcessInfo.processInfo.arguments.contains("-TonightStubUpload")
+    }
 
     var body: some View {
         Group {
@@ -172,10 +181,48 @@ struct RootView: View {
                 }
             }
         }
+        .overlay(alignment: .bottomLeading) {
+            if !uploadStatus.isEmpty {
+                Text(uploadStatus)
+                    .accessibilityIdentifier("speech.status")
+                    .padding(8)
+            }
+        }
+        .onChange(of: speechSession) { _, session in
+            Task { await speechScene.apply(session.watch) }
+        }
         .onChange(of: scenePhase) { _, phase in
+            guard phase != .active else { return }
+            if stubUpload { uploadStatus = "Suspended" }
+            model.speech.stop()
+            Task { await speechScene.sceneDidChange(isActive: false) }
             guard phase == .background else { return }
             model.backgrounded()
         }
+        .onAppear {
+            refreshSpeechSession(childID: model.child?.id)
+            Task { await speechScene.apply(speechSession.watch) }
+            guard stubUpload else { return }
+            uploadStatus = "Uploading"
+        }
+        .onChange(of: model.child?.id) { _, childID in
+            refreshSpeechSession(childID: childID)
+        }
+    }
+
+    /// Withdrawal, a flag turning off, or a different child each publish a new session, and `onChange` cancels the upload.
+    private func refreshSpeechSession(childID: UUID?) {
+        var session = speechSession
+        if let childID {
+            session = session.switchingChild(to: childID)
+            if consentCenter.record(for: childID)?.withdrawnAt != nil || consentCenter.record(for: childID)?.scopeIsActive(.onDevice) == false {
+                session = session.withdrawing()
+            }
+        }
+        if !TonightComposition.speechFlags.sarvamEnabled {
+            session = session.turningFlagOff()
+        }
+        speechSession = session
     }
 }
 

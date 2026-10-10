@@ -1,0 +1,67 @@
+{
+  "apple": {
+    "agreement": "1/1",
+    "agreementCI": [
+      "1/1",
+      "1/1"
+    ],
+    "agreements": 64,
+    "falseAcceptCI": [
+      "0/1",
+      "0/1"
+    ],
+    "falseAcceptRate": "0/1",
+    "falseAccepts": 0,
+    "falseRejectRate": "0/1",
+    "falseRejects": 0,
+    "paired": 64,
+    "perChildFalseAccept": {
+      "c0": "0/1",
+      "c1": "0/1",
+      "c2": "0/1",
+      "c3": "0/1",
+      "c4": "0/1",
+      "c5": "0/1",
+      "c6": "0/1",
+      "c7": "0/1"
+    },
+    "referenceCorrect": 48,
+    "referenceIncorrect": 16
+  },
+  "decision": "APPLE",
+  "deltaAgreement": "-1/4",
+  "deltaCI": [
+    "-1/4",
+    "-1/4"
+  ],
+  "sarvam": {
+    "agreement": "3/4",
+    "agreementCI": [
+      "3/4",
+      "3/4"
+    ],
+    "agreements": 48,
+    "falseAcceptCI": [
+      "1/1",
+      "1/1"
+    ],
+    "falseAcceptRate": "1/1",
+    "falseAccepts": 16,
+    "falseRejectRate": "0/1",
+    "falseRejects": 0,
+    "paired": 64,
+    "perChildFalseAccept": {
+      "c0": "1/1",
+      "c1": "1/1",
+      "c2": "1/1",
+      "c3": "1/1",
+      "c4": "1/1",
+      "c5": "1/1",
+      "c6": "1/1",
+      "c7": "1/1"
+    },
+    "referenceCorrect": 48,
+    "referenceIncorrect": 16
+  },
+  "scoringVersion": 2
+}

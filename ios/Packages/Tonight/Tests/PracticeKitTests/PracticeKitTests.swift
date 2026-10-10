@@ -26,6 +26,14 @@ final class PracticeKitTests: XCTestCase {
         XCTAssertTrue(list.warmup().isEmpty)
     }
 
+    func test_DEL19_removeAllDropsThatChildsWords() {
+        var list = RememberList()
+        list.add(childID: child, word: "cat", subjectID: "english", at: day(0), id: UUID())
+        list.add(childID: UUID(), word: "kept", subjectID: "english", at: day(0), id: UUID())
+        list.removeAll(childID: child)
+        XCTAssertEqual(list.active().map(\.word), ["kept"])
+    }
+
     func testWarmupCapIsFiveOldest() {
         var list = RememberList()
         for index in 0..<6 {

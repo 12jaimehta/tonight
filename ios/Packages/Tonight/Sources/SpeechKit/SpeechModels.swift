@@ -1,8 +1,7 @@
 import Foundation
 import os
 
-/// URL and anon key for the Supabase project. The app loads these from Info.plist.
-/// Tests call `use(_:)` so they do not need the app bundle.
+/// URL and anon key loaded once from the app's build config. Tests call `use(_:)`.
 public struct SupabaseSpeechConfig: Sendable, Equatable {
     public var baseURL: URL
     public var anonKey: String
@@ -15,6 +14,7 @@ public struct SupabaseSpeechConfig: Sendable, Equatable {
     public static func load(from bundle: Bundle) -> SupabaseSpeechConfig? {
         guard
             let urlString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+            !urlString.contains("$("),
             let baseURL = URL(string: urlString),
             let host = baseURL.host,
             !host.isEmpty,
@@ -24,8 +24,7 @@ public struct SupabaseSpeechConfig: Sendable, Equatable {
     }
 }
 
-/// The only network host the app may contact.
-/// `project-ref` stands in for the real Supabase project ref. The Mumbai project is not created yet.
+/// The only network host the app may contact. The host is frozen at launch from xcconfig.
 public enum TonightEndpoints {
     private static let config = OSAllocatedUnfairLock<SupabaseSpeechConfig?>(initialState: nil)
 
@@ -88,8 +87,9 @@ public enum SpeechEngineID: String, Codable, Sendable, Equatable {
 }
 
 public enum AudioConsentScope: String, Codable, Sendable, Equatable, Hashable {
-    case onDevice = "speech.on_device"
-    case server = "speech.server"
+    /// Same vocabulary as `consent_record.scopes` in the backend.
+    case onDevice = "on_device_speech"
+    case server = "server_speech"
 }
 
 public struct AudioConsentRecord: Codable, Sendable, Equatable, Identifiable {
@@ -205,7 +205,8 @@ public struct SelectionInput: Sendable, Equatable {
         sessionValid: Bool,
         onDeviceAvailable: Bool = true,
         childProfileID: UUID,
-        record: AudioConsentRecord?
+        record: AudioConsentRecord?,
+        accessToken: String = ""
     ) {
         self.studyBuild = studyBuild
         self.flagOn = flagOn
@@ -214,7 +215,11 @@ public struct SelectionInput: Sendable, Equatable {
         self.onDeviceAvailable = onDeviceAvailable
         self.childProfileID = childProfileID
         self.record = record
+        self.accessToken = accessToken
     }
+
+    /// Parent session access token sent as Authorization: Bearer. Empty until a session exists.
+    public var accessToken: String = ""
 }
 
 public enum SelectionReason: String, Codable, Sendable, Equatable {
@@ -234,6 +239,7 @@ public enum SelectionReason: String, Codable, Sendable, Equatable {
     case timeout
     case serverError
     case suspended
+    case cancelled
 }
 
 public enum SelectedEngine: Sendable, Equatable {
@@ -268,7 +274,7 @@ public enum SpeechEngineSelector {
         guard record.scopeIsActive(.onDevice) else {
             return EngineSelection(engine: .none, reason: .onDeviceWithdrawn, maySendAudio: false)
         }
-        if serverEligible(input, record: record) {
+        if ServerSpeechBuild.isStudyBuild && serverEligible(input, record: record) {
             return EngineSelection(engine: .sarvam, reason: .serverEligible, maySendAudio: true)
         }
         if !input.onDeviceAvailable {
@@ -278,8 +284,7 @@ public enum SpeechEngineSelector {
     }
 
     private static func serverEligible(_ input: SelectionInput, record: AudioConsentRecord) -> Bool {
-        input.studyBuild
-            && input.flagOn
+        input.flagOn
             && input.sessionValid
             && input.online
             && record.backendConfirmed
@@ -288,13 +293,14 @@ public enum SpeechEngineSelector {
     }
 
     private static func onDeviceReason(_ input: SelectionInput, record: AudioConsentRecord) -> SelectionReason {
-        if !input.studyBuild { return .releaseBuild }
         if !input.flagOn { return .flagOff }
         if !input.sessionValid { return .sessionExpired }
         if !input.online { return .offline }
         if !record.backendConfirmed { return .backendUnconfirmed }
         if record.version != AudioConsentRecord.currentVersion { return .staleConsentVersion }
         if record.withdrawnScopes.contains(.server) { return .serverWithdrawn }
+        if !record.scopeIsActive(.server) { return .onDeviceOnly }
+        if !ServerSpeechBuild.isStudyBuild { return .releaseBuild }
         return .onDeviceOnly
     }
 }

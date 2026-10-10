@@ -35,6 +35,24 @@ final class AlignmentTests: XCTestCase {
         XCTAssertEqual(numbers.percent, 100)
     }
 
+    func test_P15_sentenceDecimalNumberWordAndOrdinal() {
+        XCTAssertEqual(ReadingNormalizer.tokens(in: "It costs 3.5."), ["it", "costs", "3.5"])
+        XCTAssertEqual(ReadingNormalizer.tokens(in: "3.5."), ["3.5"])
+        XCTAssertEqual(ReadingNormalizer.tokens(in: "twenty five"), ["25"])
+        XCTAssertEqual(ReadingNormalizer.tokens(in: "twenty-five"), ["25"])
+        XCTAssertEqual(ReadingNormalizer.tokens(in: "3rd"), ["3"])
+        XCTAssertEqual(ReadingNormalizer.tokens(in: "1st, 2nd and 4th."), ["1", "2", "and", "4"])
+        let sentence = marker.mark(expected: "It costs 3.5.", heard: "it costs 3.5")
+        XCTAssertEqual(sentence.correct, sentence.total)
+        let words = marker.mark(expected: "twenty five", heard: "25")
+        XCTAssertEqual(words.correct, 1)
+        XCTAssertEqual(words.total, 1)
+        let ordinal = marker.mark(expected: "3rd", heard: "3")
+        XCTAssertEqual(ordinal.correct, ordinal.total)
+        let comma = AnswerScorer.score(expected: "3.5", child: "3,5", questionType: "decimal", settings: "locale=en_IN")
+        XCTAssertEqual(comma.result, .needsReview)
+    }
+
     func testPrototypeTokenizerBugsStayFixed() {
         XCTAssertEqual(ReadingNormalizer.tokens(in: "1,00,000"), ["100000"])
         XCTAssertEqual(ReadingNormalizer.tokens(in: "3.5"), ["3.5"])

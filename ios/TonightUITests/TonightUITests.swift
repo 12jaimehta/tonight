@@ -151,6 +151,18 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled)
     }
 
+    /// CG-33 / LAT-10 on the real app shell. A stubbed upload is cancelled when the scene leaves the foreground.
+    func test_CG33_LAT10_backgroundThreeSecondsIntoAStubbedUpload() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-TonightStubUpload", "-TonightFixedGate"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Uploading"].waitForExistence(timeout: 8))
+        Thread.sleep(forTimeInterval: 3)
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.staticTexts["Suspended"].waitForExistence(timeout: 8))
+    }
+
     private func launch(screen: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         var arguments = ["-TonightFixedGate"]

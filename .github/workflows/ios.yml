@@ -232,6 +232,37 @@ jobs:
           -destination '${{ steps.sim.outputs.destination }}'
           CODE_SIGNING_ALLOWED=NO
 
+      - name: Release binary omits the Sarvam adapter
+        if: steps.app.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            ${{ steps.app.outputs.flag }} ${{ steps.app.outputs.path }} \
+            -scheme Tonight \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath "$RUNNER_TEMP/tonight-release"
+          bin="$(find "$RUNNER_TEMP/tonight-release" -type f -name Tonight -perm -111 | head -1)"
+          test -n "$bin"
+          if strings "$bin" | grep -E 'audioBase64|audio_base64|consent_record_id|api\.sarvam\.ai'; then
+            echo "Release binary still contains the study speech adapter"
+            exit 1
+          fi
+
+      - name: Build Tonight Study configuration
+        if: steps.app.outputs.present == 'true'
+        env:
+          TONIGHT_STUDY_BUILD: "1"
+        run: >
+          xcodebuild build
+          ${{ steps.app.outputs.flag }} ${{ steps.app.outputs.path }}
+          -scheme Tonight
+          -configuration Study
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          -derivedDataPath "$RUNNER_TEMP/tonight-study"
+
   backend:
     name: backend deno
     runs-on: ubuntu-latest
@@ -250,3 +281,9 @@ jobs:
 
       - name: Check SQL migrations
         run: python3 backend/scripts/check_migrations.py
+
+      - name: Cross-check the gate harness
+        run: python3 ios/scripts/gate_harness.py
+
+      - name: Parental gate wraps external links
+        run: sh ios/scripts/check_parental_gate.sh
