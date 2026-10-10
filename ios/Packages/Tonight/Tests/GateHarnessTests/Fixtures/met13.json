@@ -1,1 +1,32 @@
-{"cohort":[{"id":"aged","age":7,"schoolClass":"2"},{"id":"ageless","schoolClass":"2"}],"recordings":[{"id":"aged-0","childID":"aged","referenceCorrect":true,"appleCorrect":true,"sarvamCorrect":true,"age":7,"schoolClass":"2"},{"id":"ageless-0","childID":"ageless","referenceCorrect":true,"appleCorrect":true,"sarvamCorrect":true,"schoolClass":"2"}]}
+{
+  "schema_version": 1,
+  "children": [
+    {
+      "child_id": "aged",
+      "age": 7,
+      "school_class": 2,
+      "recordings": [
+        {
+          "recording_id": "aged-passage",
+          "cells": [
+            {"reference_correct": true, "apple_correct": true, "sarvam_correct": true, "n": 18},
+            {"reference_correct": false, "apple_correct": false, "sarvam_correct": false, "n": 2}
+          ]
+        }
+      ]
+    },
+    {
+      "child_id": "ageless",
+      "school_class": 2,
+      "recordings": [
+        {
+          "recording_id": "ageless-passage",
+          "cells": [
+            {"reference_correct": true, "apple_correct": true, "sarvam_correct": true, "n": 18},
+            {"reference_correct": false, "apple_correct": false, "sarvam_correct": false, "n": 2}
+          ]
+        }
+      ]
+    }
+  ]
+}

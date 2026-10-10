@@ -1,81 +1,89 @@
 # Gate harness fixture schema
 
-The independent checker reads these files. Counts are integers. Rates are reduced ratios written as `numerator/denominator` (not floats, not percents). A ratio of `9/10` is exactly 90 percent. Compare with cross-multiplication.
+This is the M0 results file from the independent checker README. Rates in a results report are numerator/denominator pairs, not floats. Outcome codes are `APPLE`, `SARVAM`, `NO_GO`, `OUT_OF_COHORT`, `INVALID_STUDY`, and `INVALID_INPUT`.
 
-Large cohorts (`close_call`, `exactly_090`, and the other names in `requiredGoldens` inside `GateHarnessTests.swift`) are built at test time from the seeds below. They are not stored as generated JSON. A missing `*.golden.json` fails the run. The harness does not write a golden unless someone passes `--write` to `ios/scripts/gate_harness.py`.
+`schema_version` must be `1`. `children` is a non-empty list. Each child has a non-empty string `child_id`, an integer `age`, an integer `school_class`, and a non-empty `recordings` list. Each recording has a unique `recording_id` and exactly one of `cells` or `words`.
 
-## Document (`*.json`)
+A cell is one pattern of the booleans plus a non-negative integer `n`. `reference_correct` may be `null` for an unjudged word. Duplicate judged patterns in one recording are added together. A word object is one judged or unjudged token. Both engines are judged on the same tokens.
 
 ```json
 {
-  "cohort": ["c0"],
-  "recordings": [
+  "schema_version": 1,
+  "children": [
     {
-      "id": "c0-0",
-      "childID": "c0",
-      "referenceCorrect": true,
-      "appleCorrect": true,
-      "sarvamCorrect": false,
+      "child_id": "c1",
       "age": 7,
-      "schoolClass": "2"
+      "school_class": 2,
+      "recordings": [
+        {
+          "recording_id": "c1-passage",
+          "cells": [
+            {"reference_correct": true, "apple_correct": true, "sarvam_correct": true, "n": 180},
+            {"reference_correct": true, "apple_correct": false, "sarvam_correct": true, "n": 12},
+            {"reference_correct": true, "apple_correct": false, "sarvam_correct": false, "n": 8},
+            {"reference_correct": false, "apple_correct": false, "sarvam_correct": false, "n": 40}
+          ]
+        }
+      ]
     }
   ]
 }
 ```
 
-| Field | Type | Unit / meaning |
-|---|---|---|
-| `cohort` | array of strings or objects | Children who may be scored. A string is an id only and skips the age screen. An object is a demographic member. |
-| `cohort[].id` | string | Child id. Recordings use the same id in `childID`. |
-| `cohort[].age` | integer or absent | Years. Required on an object member. In-cohort ages are 6, 7, and 8. Missing age on an object member is `OUT_OF_COHORT` and that child is not scored. |
-| `cohort[].schoolClass` | string or absent | `"1"`, `"2"`, or `"3"`. Any other present value is `COHORT_REJECTED`. |
-| `recordings[].id` | string | Recording id. |
-| `recordings[].childID` | string | Must be a cohort id. Otherwise `OUT_OF_COHORT`. |
-| `recordings[].referenceCorrect` | boolean | The reference word was correct. |
-| `recordings[].appleCorrect` | boolean or null | Apple marked the word correct. Null is `UNPAIRED_RECORDING`. |
-| `recordings[].sarvamCorrect` | boolean or null | Sarvam marked the word correct. Null is `UNPAIRED_RECORDING`. |
-| `recordings[].age` | integer or absent | If present, must equal the member age and be in 6...8. |
-| `recordings[].schoolClass` | string or absent | If present, must equal the member class and be in `"1"`...`"3"`. |
+## Screening
 
-Agreement, false accepts, and false rejects are counted from these booleans. A false accept is `referenceCorrect == false` and the engine value `true`. A false reject is `referenceCorrect == true` and the engine value `false`. A child with no incorrect reference has per-child false-accept `n/a` and is not failed by the 10% cap.
-
-## Decision (`decision` on the report, and in `*.golden.json`)
-
-Enum: `APPLE`, `SARVAM`, `NO_GO`.
-
-Pass bar, all required: pooled agreement `>= 9/10`, pooled false accepts `<= 1/20`, pooled false rejects `<= 1/10`, and every scored child `<= 1/10` false accepts. Exactly `9/10` passes.
-
-| Condition | Decision |
+| Input | Code |
 |---|---|
-| Only Sarvam passes (Apple fails) | `SARVAM` (MET-36) |
-| Both pass, Sarvam agreement `>=` Apple `+ 1/20`, the paired bootstrap interval's lower end is `> 0`, and Sarvam's false-accept rate is `<=` Apple's | `SARVAM` |
-| Both pass, but Sarvam's false-accept rate is worse than Apple's | `APPLE` (MET-34) |
-| Both pass, but the gap is under `1/20` or the interval includes 0 | `APPLE` |
-| Only Apple passes | `APPLE` |
-| Neither passes | `NO_GO` |
+| Missing age, JSON null age, or age outside {6, 7, 8} | `OUT_OF_COHORT` |
+| Missing class, JSON null class, or class outside {1, 2, 3} | `OUT_OF_COHORT` |
+| In-range pair other than 6→1, 7→2, 8→3 | warning; the study is still scored |
+| Pooled false-accept or false-reject denominator is 0 | `INVALID_STUDY` |
+| Schema mismatch | `INVALID_INPUT` |
 
-`met36.json`, `met34.json`, and `met13.json` are the boundary documents. `met13.json` is a child with no age and must error with `OUT_OF_COHORT` rather than a decision.
+The child is not dropped and is not scored when the code is `OUT_OF_COHORT`.
 
-## Seeds the tests expand
+## Pass bar
 
-`rows(children, items, appleCorrect, sarvamCorrect)` makes children `c00`... and `items` recordings each. `referenceCorrect` is true. `appleCorrect` is true when `item < appleCorrect`. Same for Sarvam.
+Agreement is matches / judged words. Unjudged words (`reference_correct: null`) are excluded. A recording with no reference-correct words is left out of the false-reject count. A recording with no reference-incorrect words adds 0 to the false-accept numerator and denominator. A child with no reference-incorrect words is skipped for the per-child false-accept cap. Pooled false-accept allows a tie at 1/20.
 
-| Name | Seed |
+| Bar | Passes when |
 |---|---|
-| `apple_pass` | 8 children `c0`...`c7`, 8 items. `referenceCorrect` is `item < 6`. Apple matches the reference. Sarvam is always true. |
-| `sarvam_pass` | `apple_pass` with Apple and Sarvam swapped. |
-| `no_go` | `rows(4, 10, 4, 4)` |
-| `close_call` | `rows(4, 1000, 900, 901)` |
-| `exactly_090` | 20 children, 50 items, reference true. Even children hear 47, odd children hear 43, both engines. |
-| `exactly_plus_5pp` | `rows(4, 20, 18, 19)` |
-| `ci_includes_zero` | 10 children, 20 items, reference true. Apple is `item < 18`. Sarvam is `item < 10` for `c09` and `item < 20` otherwise. |
-| `per_child_fa_cap` | Child `good` has 19 incorrect words, both engines false. Child `over` has 1 incorrect word, both engines true. |
-| `per_child_fa_exact` | 10 children, 10 incorrect words each. Only `c00` item 0 is a false accept for both engines. |
-| `unpaired` | One row whose `sarvamCorrect` is null. |
-| `out_of_cohort` | The only recording's child is not in the cohort. |
-| `age_reject` | Object member `c00` age 9 class `"2"`. |
-| `class_reject` | Object member `c00` age 7 class `"5"`. |
+| Agreement | ≥ 9/10 |
+| Pooled false-accept | ≤ 1/20 |
+| Per-child false-accept | every child with reference-incorrect words is ≤ 1/10 |
+| False-reject | ≤ 1/10 |
 
-## Report fields the goldens lock
+There is no per-child false-reject cap.
 
-`scoringVersion` (integer, currently 2), `decision`, `deltaAgreement` (`"n/d"`), `deltaCI` (two ratio strings, 2.5% and 97.5% of 10,000 child-level resamples, seed `20261010`), and for `apple` and `sarvam`: `paired`, `agreements`, `falseAccepts`, `referenceIncorrect`, `falseRejects`, `referenceCorrect`, `agreement`, `falseAcceptRate`, `falseRejectRate`, `perChildFalseAccept` (map of child id to a ratio string or `"n/a"`), `agreementCI`, `falseAcceptCI`.
+## Decision
+
+1. Both engines pass, and Sarvam clearly beats Apple: `SARVAM`.
+2. Both pass, and Sarvam does not clearly beat Apple: `APPLE`.
+3. Only one engine passes: that engine.
+4. Neither passes: `NO_GO`.
+
+Sarvam clearly beats Apple only when all three hold:
+
+- pooled agreement(Sarvam) − pooled agreement(Apple) ≥ 5/100
+- the child-cluster bootstrap interval's lower end is strictly greater than 0
+- pooled false-accept(Sarvam) ≤ pooled false-accept(Apple)
+
+A tie on false-accept is not worse. An interval endpoint of exactly 0 stays `APPLE`.
+
+## Bootstrap
+
+95% two-sided percentile interval, 10,000 resamples, Hyndman–Fan type 7, seed `20261009`. The seed is a top-level `seed` on the results JSON and on `interval.seed`. Draws are `random.Random.randrange` over the child list. Every recording of a drawn child stays together.
+
+## Results JSON
+
+`schema_version`, `decision`, `seed`, `warnings`, `agreement_delta` (`numerator`, `denominator`), `apple`, `sarvam`, `clearly_beats`, and `interval` (`method`, `generator`, `confidence`, `resamples`, `seed`, `low`, `high`, `strictly_above_zero`).
+
+Error JSON is `{ "error": "OUT_OF_COHORT" | "INVALID_STUDY" | "INVALID_INPUT", "message": "..." }`.
+
+Large cohorts are built from cell counts in the test. A missing `*.golden.json` for the seeded names fails the run. Those goldens are not rewritten by the test.
+
+| Fixture | Result |
+|---|---|
+| `met36.json` | `SARVAM` (only Sarvam passes; denominators are defined) |
+| `met34.json` | `APPLE` (both pass, Sarvam false-accept is worse) |
+| `met13.json` | `OUT_OF_COHORT` |
