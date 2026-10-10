@@ -228,6 +228,34 @@ Deno.test("DEL-11 DEL-21 child delete reaches the queue and purge finishes befor
   assertEquals(unfinished, []);
 });
 
+Deno.test("N-12 storage-purge request matches the shared contract", async () => {
+  const fixture = JSON.parse(
+    await Deno.readTextFile(new URL("./storage-purge.contract.json", import.meta.url)),
+  );
+  assertEquals(fixture.name, "storage-purge");
+  assertEquals(fixture.request.method, "POST");
+  assertEquals(fixture.request.path, "/functions/v1/storage-purge");
+  assertEquals(fixture.request.body.required, ["mode"]);
+  assertEquals(fixture.request.body.properties.mode.enum, ["due", "retention"]);
+  const response = await handleStoragePurge(
+    new Request("https://project-ref.supabase.co/functions/v1/storage-purge", {
+      method: fixture.request.method,
+      headers: { authorization: "Bearer service-role", "content-type": "application/json" },
+      body: JSON.stringify({ mode: "due" }),
+    }),
+    { purgeDue: async () => ({ deletedIds: ["queue-1"], remaining: [] }) },
+  );
+  assertEquals(response.status, 200);
+  const missing = await handleStoragePurge(
+    new Request("https://project-ref.supabase.co/functions/v1/storage-purge", {
+      method: "POST",
+      body: JSON.stringify({ mode: "due" }),
+    }),
+    { purgeDue: async () => ({ deletedIds: [], remaining: [] }) },
+  );
+  assertEquals(missing.status, 401);
+});
+
 Deno.test("DEL-21 the migration alerts on unfinished rows", async () => {
   const url = new URL("../../migrations/20261010130500_schedule_storage_purge.sql", import.meta.url);
   const sql = await Deno.readTextFile(url);
