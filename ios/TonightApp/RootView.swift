@@ -5,7 +5,12 @@ import SwiftUI
 struct RootView: View {
     var consentCenter: ConsentCenter
     @Environment(\.scenePhase) private var scenePhase
-    @State private var model = TonightComposition.makeModel()
+    @State private var model: TonightModel
+
+    init(consentCenter: ConsentCenter, emailOTP: EmailOTPClient? = nil) {
+        self.consentCenter = consentCenter
+        _model = State(initialValue: TonightComposition.makeModel(consentCenter: consentCenter, emailOTP: emailOTP))
+    }
     @State private var uploadStatus = ""
     @State private var speechScene = SpeechSceneController(runner: TonightSpeechScene.makeRunner())
     @State private var speechSession = SpeechSessionModel(flagOn: TonightComposition.speechFlags.sarvamEnabled)
@@ -58,7 +63,13 @@ struct RootView: View {
                     onOpenTask: model.openTask,
                     onRetry: { model.today.phase = .ready },
                     onKey: model.pressGate,
-                    onCloseGate: model.closeGate
+                    onCloseGate: model.closeGate,
+                    showingWithdrawal: model.showingWithdrawal,
+                    confirmingWithdrawal: model.confirmingWithdrawal,
+                    withdrawalNotice: model.withdrawalNotice,
+                    onAskWithdrawal: model.askWithdrawal,
+                    onConfirmWithdrawal: { Task { @MainActor in await model.confirmWithdrawal() } },
+                    onCancelWithdrawal: model.cancelWithdrawal
                 )
             case .newTask:
                 if let child = model.child {
@@ -202,11 +213,15 @@ struct RootView: View {
         .onAppear {
             refreshSpeechSession(childID: model.child?.id)
             Task { await speechScene.apply(speechSession.watch) }
+            Task { await consentCenter.flush(at: Date()) }
             guard stubUpload else { return }
             uploadStatus = "Uploading"
         }
         .onChange(of: model.child?.id) { _, childID in
             refreshSpeechSession(childID: childID)
+        }
+        .onChange(of: model.withdrawalEpoch) { _, _ in
+            refreshSpeechSession(childID: model.child?.id)
         }
     }
 

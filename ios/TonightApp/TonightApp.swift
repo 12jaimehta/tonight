@@ -27,8 +27,8 @@ enum TonightComposition {
     static let sessionStore: any ParentSessionStoring = KeychainSessionStore()
 
     @MainActor
-    static func makeModel() -> TonightModel {
-        TonightModel(sessionStore: sessionStore)
+    static func makeModel(consentCenter: ConsentCenter? = nil, emailOTP: EmailOTPClient? = nil) -> TonightModel {
+        TonightModel(sessionStore: sessionStore, consentCenter: consentCenter, emailOTP: emailOTP)
     }
 
     static func makeConsentCenter() throws -> ConsentCenter {
@@ -48,11 +48,15 @@ enum TonightComposition {
     static func unconfiguredCenter() -> ConsentCenter {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("tonight-consent-\(UUID().uuidString)", isDirectory: true)
-        return (try? ConsentCenter.make(
-            directory: directory,
-            eraser: IgnoringChildEraser(),
-            sender: FailingDeletionSender()
-        )) ?? ConsentCenter(ledger: try! SpeechLedger(directory: directory), eraser: IgnoringChildEraser(), sender: FailingDeletionSender())
+        do {
+            return try ConsentCenter.make(
+                directory: directory,
+                eraser: UnconfiguredChildEraser(),
+                sender: FailingDeletionSender()
+            )
+        } catch {
+            fatalError("Consent store could not be created: \(error)")
+        }
     }
 
     static func makeEmailOTP() -> EmailOTPClient? {
@@ -80,6 +84,13 @@ enum TonightComposition {
             anonKey: config.anonKey,
             accessToken: ""
         )
+    }
+}
+
+/// A missing store must not pretend the child's data was deleted.
+private struct UnconfiguredChildEraser: ChildDataErasing {
+    func erase(childID: UUID) throws {
+        throw DeletionSendError.notConfigured
     }
 }
 

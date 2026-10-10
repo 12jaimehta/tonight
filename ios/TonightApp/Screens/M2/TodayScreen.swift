@@ -14,6 +14,12 @@ struct TodayScreen: View {
     var onRetry: @MainActor () -> Void
     var onKey: @MainActor (String) -> Void
     var onCloseGate: @MainActor () -> Void
+    var showingWithdrawal: Bool = false
+    var confirmingWithdrawal: Bool = false
+    var withdrawalNotice: String = ""
+    var onAskWithdrawal: @MainActor () -> Void = {}
+    var onConfirmWithdrawal: @MainActor () -> Void = {}
+    var onCancelWithdrawal: @MainActor () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -51,6 +57,15 @@ struct TodayScreen: View {
                     childName: today.selected?.nickname ?? "your child",
                     onKey: onKey,
                     onClose: onCloseGate
+                )
+            }
+            if showingWithdrawal && !gate.presented {
+                WithdrawConsentSheet(
+                    confirming: confirmingWithdrawal,
+                    notice: withdrawalNotice,
+                    onAsk: onAskWithdrawal,
+                    onConfirm: onConfirmWithdrawal,
+                    onCancel: onCancelWithdrawal
                 )
             }
         }

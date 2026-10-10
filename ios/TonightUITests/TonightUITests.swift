@@ -151,6 +151,25 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled)
     }
 
+    func test_CG32_withdrawConsentConfirmsBehindTheGate() {
+        let app = launch(screen: "child")
+        app.buttons["child.lock"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
+        XCTAssertTrue(app.staticTexts["Tonight for Aarav"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["consent.withdraw"].exists)
+        app.buttons["today.settings"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
+        tapDigits(["3", "4", "7"], in: app)
+        let withdraw = app.buttons["consent.withdraw"]
+        XCTAssertTrue(withdraw.waitForExistence(timeout: 5))
+        withdraw.tap()
+        let confirm = app.buttons["consent.withdraw.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(app.staticTexts["Consent withdrawn"].waitForExistence(timeout: 5))
+    }
+
     /// CG-33 / LAT-10 on the real app shell. A stubbed upload is cancelled when the scene leaves the foreground.
     func test_CG33_LAT10_backgroundThreeSecondsIntoAStubbedUpload() {
         let app = XCUIApplication()

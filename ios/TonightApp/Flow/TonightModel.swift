@@ -421,16 +421,26 @@ final class TonightModel {
     var gatePurpose: GatePurpose = .exitChild
     var gate: GateModel
     var authMethod = "email"
+    var showingWithdrawal = false
+    var confirmingWithdrawal = false
+    var withdrawalNotice = ""
+    var withdrawalEpoch = 0
     let consentStore = InMemoryAdultConsentStore()
+    let consentCenter: ConsentCenter?
+    let emailOTP: EmailOTPClient?
     let sessionStore: any ParentSessionStoring
     let speech: any SpeechSynthesizing
 
     init(
         sessionStore: any ParentSessionStoring = KeychainSessionStore(),
-        speech: any SpeechSynthesizing = IndianEnglishSpeech()
+        speech: any SpeechSynthesizing = IndianEnglishSpeech(),
+        consentCenter: ConsentCenter? = nil,
+        emailOTP: EmailOTPClient? = nil
     ) {
         self.sessionStore = sessionStore
         self.speech = speech
+        self.consentCenter = consentCenter
+        self.emailOTP = emailOTP
         let arguments = ProcessInfo.processInfo.arguments
         gate = GateModel(fixed: arguments.contains("-TonightFixedGate"))
         if let index = arguments.firstIndex(of: "-TonightScreen"), arguments.indices.contains(arguments.index(after: index)) {
@@ -658,10 +668,15 @@ final class TonightModel {
             gate.presented = false
             ensureToday()
             switch gatePurpose {
-            case .exitChild, .settings:
-                if route == .childHome || gatePurpose == .exitChild {
+            case .exitChild:
+                if route == .childHome {
                     route = .today
                 }
+            case .settings:
+                route = .today
+                confirmingWithdrawal = false
+                withdrawalNotice = ""
+                showingWithdrawal = true
             case .parentCheck:
                 route = .parentCheck
             case .enableTyping:
@@ -676,6 +691,48 @@ final class TonightModel {
 
     func backgrounded() {
         gate.resetForBackground()
+    }
+
+    func askWithdrawal() {
+        confirmingWithdrawal = true
+    }
+
+    func cancelWithdrawal() {
+        showingWithdrawal = false
+        confirmingWithdrawal = false
+    }
+
+    /// Clears the adult consent record, withdraws the child in the consent store, and flushes the deletion queue.
+    func confirmWithdrawal() async {
+        let childID = child?.id ?? today.selected?.id
+        consentStore.clear()
+        guard let childID else {
+            withdrawalNotice = "No child to withdraw."
+            return
+        }
+        guard let consentCenter else {
+            withdrawalNotice = "Consent store is not configured."
+            return
+        }
+        _ = try? emailOTP?.tokens.load()
+        do {
+            if consentCenter.record(for: childID) == nil {
+                try consentCenter.grant(AudioConsentRecord(
+                    parentID: "parent-placeholder",
+                    childProfileID: childID,
+                    scopes: [.onDevice],
+                    tappedAt: Date(),
+                    method: "screen",
+                    backendConfirmed: false
+                ))
+            }
+            _ = try await consentCenter.withdraw(childProfileID: childID, at: Date())
+            withdrawalNotice = "Consent withdrawn"
+            confirmingWithdrawal = false
+            withdrawalEpoch += 1
+        } catch {
+            withdrawalNotice = "Couldn't withdraw consent."
+        }
     }
 
     func openTask(_ id: UUID) {
