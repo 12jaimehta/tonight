@@ -8,7 +8,7 @@ import Foundation
 /// - `don't` stays one token, then folds to `dont` so a missing apostrophe still matches.
 /// - Devanagari vowel signs and nukta stay attached (`किताब` is not split into `क त ब`).
 ///
-/// Case folding uses Unicode default lowercase, not `Locale.current`.
+/// Case folding uses Unicode default lowercase. The device locale is not consulted.
 public enum ReadingNormalizer {
     public static func tokens(in text: String) -> [String] {
         let folded = text.precomposedStringWithCompatibilityMapping.lowercased()
@@ -351,7 +351,7 @@ private enum Piece {
     case word(String)
 }
 
-/// English ordinals for en-IN. The forms are written out here. `Locale.current` is never used.
+/// English ordinals for en-IN. The forms are written out here. The device locale is not consulted.
 enum OrdinalWords {
     static func canonical(_ raw: String) -> String? {
         let parts = raw.replacingOccurrences(of: "-", with: " ").split(separator: " ").map(String.init)

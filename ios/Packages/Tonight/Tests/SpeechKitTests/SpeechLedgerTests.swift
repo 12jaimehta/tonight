@@ -282,6 +282,7 @@ final class SpeechLedgerTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
             .appendingPathComponent("ios/TonightApp/TonightApp.swift")
         let source = try String(contentsOf: app, encoding: .utf8)
         XCTAssertTrue(source.contains("KeychainAccessTokenStore().load()"))
