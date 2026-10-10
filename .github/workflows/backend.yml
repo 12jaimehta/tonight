@@ -1,0 +1,29 @@
+name: Backend
+
+on:
+  pull_request:
+    branches:
+      - backend-v1
+  push:
+    branches:
+      - backend-v1
+
+jobs:
+  sarvam-proxy:
+    name: sarvam-proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Test sarvam-proxy
+        working-directory: backend/supabase/functions/sarvam-proxy
+        run: deno test --deny-net
+
+      - name: Check SQL migrations
+        run: python3 backend/scripts/check_migrations.py
