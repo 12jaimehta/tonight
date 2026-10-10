@@ -36,11 +36,15 @@ A cell is one pattern of the booleans plus a non-negative integer `n`. `referenc
 |---|---|
 | Missing age, JSON null age, or age outside {6, 7, 8} | `OUT_OF_COHORT` |
 | Missing class, JSON null class, or class outside {1, 2, 3} | `OUT_OF_COHORT` |
-| In-range pair other than 6→1, 7→2, 8→3 | warning; the study is still scored |
+| In-range age more than 1 year from school class + 5 | warning only; the study is still scored |
 | Pooled false-accept or false-reject denominator is 0 | `INVALID_STUDY` |
 | Schema mismatch | `INVALID_INPUT` |
 
 The child is not dropped and is not scored when the code is `OUT_OF_COHORT`.
+
+Expected age is school class + 5, tolerance ±1. Ages stay in {6, 7, 8} and classes stay in {1, 2, 3}; anything outside that is `OUT_OF_COHORT`, not a warning. Inside that range the warning fires only for class 1 with age 8 and class 3 with age 6. The other seven combinations do not warn. A mismatch never rejects the study. A pooled false-accept or false-reject denominator of 0 is still `INVALID_STUDY` and never passes.
+
+This warning is narrower than the independent checker's exact pairs 6→1, 7→2, and 8→3. The results JSON field names stay the same (`decision`, `seed`, `warnings`, `interval`, and the rest of this file). The checker is not copied into this harness.
 
 ## Pass bar
 

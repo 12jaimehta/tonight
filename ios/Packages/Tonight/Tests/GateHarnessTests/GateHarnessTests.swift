@@ -13,17 +13,30 @@ final class GateHarnessTests: XCTestCase {
         XCTAssertEqual(GateHarness.sarvamMargin, Rational(5, 100))
     }
 
-    func test_pairWarningScoresAnInRangeMismatch() throws {
-        let report = try evaluate(study([
-            child("c1", age: 6, schoolClass: 2, cells: passingCells()),
-        ]))
-        XCTAssertEqual(report.decision, .apple)
-        XCTAssertEqual(report.warnings, [
-            "child c1 age 6 is paired with class 2; expected class 1",
-        ])
-        let document = report.dictionary()
-        XCTAssertEqual(document["warnings"] as? [String], report.warnings)
-        XCTAssertEqual(document["schema_version"] as? Int, 1)
+    func test_PMRule7_nineInRangeAgeClassCombinations() throws {
+        let warned: Set<String> = ["1-8", "3-6"]
+        for schoolClass in 1...3 {
+            for age in 6...8 {
+                let report = try evaluate(study([
+                    child("c1", age: age, schoolClass: schoolClass, cells: passingCells()),
+                ]))
+                let key = "\(schoolClass)-\(age)"
+                XCTAssertNotEqual(report.decision, .noGo, key)
+                XCTAssertEqual(report.decision, .apple, key)
+                if warned.contains(key) {
+                    let expectedAge = schoolClass + 5
+                    XCTAssertEqual(report.warnings, [
+                        "child c1 age \(age) is paired with class \(schoolClass); expected age \(expectedAge) ± 1",
+                    ], key)
+                } else {
+                    XCTAssertEqual(report.warnings, [], key)
+                }
+                let document = report.dictionary()
+                XCTAssertEqual(document["warnings"] as? [String], report.warnings, key)
+                XCTAssertEqual(document["decision"] as? String, "APPLE", key)
+                XCTAssertEqual(document["schema_version"] as? Int, 1, key)
+            }
+        }
     }
 
     func test_OUT_OF_COHORT_missingOrOutOfRangeAgeOrClass() throws {

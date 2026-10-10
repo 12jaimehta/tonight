@@ -4,9 +4,10 @@ import Foundation
 /// independent checker: `APPLE`, `SARVAM`, `NO_GO`, `OUT_OF_COHORT`,
 /// `INVALID_STUDY`, and `INVALID_INPUT`.
 ///
-/// Expected age/class pairs are 6→1, 7→2, and 8→3. Any other in-range pair
-/// is a warning and the study is still scored. A pooled false-accept or
-/// false-reject denominator of 0 is `INVALID_STUDY` and never passes.
+/// Expected age is school class + 5, with tolerance ±1. The only in-range
+/// warnings are class 1 with age 8 and class 3 with age 6. A mismatch is a
+/// warning and is never a rejection. A pooled false-accept or false-reject
+/// denominator of 0 is `INVALID_STUDY` and never passes.
 public enum GateHarness {
     public static let schemaVersion = 1
     public static let bootstrapCount = 10_000
@@ -326,15 +327,15 @@ private func parseCohort(_ payload: [String: Any]) throws -> ParsedCohort {
             "\(problems.count) cohort member(s) outside ages 6-8 and classes 1-3: \(problems.joined(separator: "; "))"
         )
     }
-    let expectedClass = [6: 1, 7: 2, 8: 3]
     var children: [ChildCluster] = []
     var warnings: [String] = []
     for child in pending {
         let age = child.age!
         let schoolClass = child.schoolClass!
         children.append(ChildCluster(childID: child.id, age: age, schoolClass: schoolClass, recordings: child.recordings))
-        if schoolClass != expectedClass[age] {
-            warnings.append("child \(child.id) age \(age) is paired with class \(schoolClass); expected class \(expectedClass[age]!)")
+        let expectedAge = schoolClass + 5
+        if abs(age - expectedAge) > 1 {
+            warnings.append("child \(child.id) age \(age) is paired with class \(schoolClass); expected age \(expectedAge) ± 1")
         }
     }
     return ParsedCohort(children: children, warnings: warnings)
