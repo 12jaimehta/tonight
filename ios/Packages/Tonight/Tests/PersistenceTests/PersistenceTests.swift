@@ -190,15 +190,3 @@ private func assertCompleteProtection(_ url: URL, file: StaticString = #filePath
         XCTAssertEqual(protection, .complete, file: file, line: line)
     }
 }
-
-/// The iOS Simulator accepts the complete-protection attribute and then omits it.
-/// A device must report it. A simulator that reports a different class still fails.
-private func assertCompleteProtection(_ url: URL, file: StaticString = #filePath, line: UInt = #line) throws {
-    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-    let protection = attributes[.protectionKey] as? FileProtectionType
-    if ProcessInfo.processInfo.environment["SIMULATOR_UDID"] != nil {
-        XCTAssertTrue(protection == nil || protection == .complete, file: file, line: line)
-    } else {
-        XCTAssertEqual(protection, .complete, file: file, line: line)
-    }
-}

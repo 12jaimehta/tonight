@@ -41,7 +41,8 @@ struct WithdrawConsentSheet: View {
             .padding(24)
             .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(TonightColor.white))
             .padding(24)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("consent.withdraw.sheet")
         }
-        .accessibilityIdentifier("consent.withdraw.sheet")
     }
 }
