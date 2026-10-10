@@ -5,6 +5,7 @@ import SpeechKit
 import SwiftUI
 
 struct RootView: View {
+    var consentCenter: ConsentCenter
     @Environment(\.scenePhase) private var scenePhase
     @State private var gate = ParentalGateSession()
     @State private var showingParent = false
@@ -51,6 +52,7 @@ struct RootView: View {
             notice = ""
         }
         .onAppear {
+            _ = consentCenter.ledger.directory
             guard stubUpload else { return }
             uploadStatus = "Uploading"
         }

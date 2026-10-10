@@ -108,6 +108,45 @@ final class PersistenceTests: XCTestCase {
         }
     }
 
+    func test_DEL19_withdrawalDeletesSwiftDataRememberWordsAndMarks() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let container = try TonightStore.makeContainer(at: directory.appendingPathComponent("Tonight.store"))
+        let context = ModelContext(container)
+        let child = UUID()
+        let other = UUID()
+        let task = try HomeworkTask.make(
+            childID: child,
+            subjectID: "english",
+            schoolClass: "2",
+            instruction: "Read",
+            checkMode: .parent,
+            pagePhotoRefs: [PhotoRef(relativePath: "pages/n.jpg")],
+            stars: 3
+        ).get()
+        context.insert(TonightSchemaV1.StoredHomework(task: task))
+        let attempt = NotebookAttempt(taskID: task.id, workPhotoRef: PhotoRef(relativePath: "pages/n.jpg"))
+        context.insert(TonightSchemaV1.StoredNotebook(attempt: attempt))
+        let check = try XCTUnwrap(ParentCheck(attemptID: attempt.id, stars: 2))
+        context.insert(TonightSchemaV1.StoredParentCheck(check: check))
+        context.insert(TonightSchemaV1.StoredRemember(entry: RememberEntry(
+            id: UUID(), childID: child, word: "ship", subjectID: "english", createdAt: Date()
+        )))
+        context.insert(TonightSchemaV1.StoredRemember(entry: RememberEntry(
+            id: UUID(), childID: other, word: "kept", subjectID: "english", createdAt: Date()
+        )))
+        try context.save()
+
+        try ChildWithdrawalErase.erase(childID: child, in: context)
+
+        let words = try context.fetch(FetchDescriptor<TonightSchemaV1.StoredRemember>())
+        XCTAssertEqual(words.map(\.word), ["kept"])
+        let homework = try context.fetch(FetchDescriptor<TonightSchemaV1.StoredHomework>())
+        XCTAssertNil(homework.first { $0.childID == child }?.stars)
+        let checks = try context.fetch(FetchDescriptor<TonightSchemaV1.StoredParentCheck>())
+        XCTAssertTrue(checks.isEmpty)
+    }
+
     func testPhotosAreExcludedFromBackupAndNeedTheParent() throws {
         XCTAssertEqual(LocalProtection.fileProtection, .complete)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

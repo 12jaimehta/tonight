@@ -203,6 +203,57 @@ public final class SpeechLedger: @unchecked Sendable {
         }
     }
 
+    /// Drops server audio and queues the backend delete. On-device Remember words and marks stay.
+    @discardableResult
+    public func withdrawServer(childProfileID: UUID, at date: Date) throws -> WithdrawalEffect {
+        let prepared: (urls: [URL], hadServer: Bool) = lock.withLock { file in
+            let urls = file.artefacts.compactMap { artefact -> URL? in
+                guard artefact.childProfileID == childProfileID, artefact.serverPath, let filename = artefact.filename else { return nil }
+                return directory
+                    .appendingPathComponent(childProfileID.uuidString, isDirectory: true)
+                    .appendingPathComponent(filename)
+            }
+            let hadServer = file.consent.contains { record in
+                record.childProfileID == childProfileID && record.scopeIsActive(.server)
+            } || file.artefacts.contains { $0.childProfileID == childProfileID && $0.serverPath }
+            return (urls, hadServer)
+        }
+        var deletedAudio = 0
+        for url in prepared.urls where FileManager.default.fileExists(atPath: url.path) {
+            let bytes = (try? Data(contentsOf: url).count) ?? 0
+            try FileManager.default.removeItem(at: url)
+            deletedAudio += bytes
+        }
+        return try lock.withLock { file in
+            let removed = file.artefacts.filter { $0.childProfileID == childProfileID && $0.serverPath }
+            file.artefacts.removeAll { $0.childProfileID == childProfileID && $0.serverPath }
+            if let index = file.consent.firstIndex(where: { $0.childProfileID == childProfileID }) {
+                file.consent[index].withdrawnScopes.insert(.server)
+                file.consent[index].scopes.remove(.server)
+            }
+            if prepared.hadServer {
+                file.queue.append(ServerDeletionJob(
+                    id: UUID(),
+                    childProfileID: childProfileID,
+                    prefix: "\(childProfileID.uuidString)/",
+                    enqueuedAt: date,
+                    attempts: 0,
+                    nextAttemptAt: date,
+                    completedAt: nil
+                ))
+            }
+            try save(file)
+            return WithdrawalEffect(
+                deletedAudioBytes: deletedAudio,
+                deletedTranscripts: removed.filter { $0.kind == .transcript }.count,
+                deletedAlignments: removed.filter { $0.kind == .alignment }.count,
+                deletedMarks: 0,
+                deletedRememberWords: 0,
+                queuedServerDeletion: prepared.hadServer
+            )
+        }
+    }
+
     public func dueDeletions(at date: Date) -> [ServerDeletionJob] {
         lock.withLock { file in
             file.queue.filter { $0.completedAt == nil && $0.nextAttemptAt <= date }
