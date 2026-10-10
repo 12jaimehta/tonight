@@ -73,6 +73,27 @@ final class PersistenceTests: XCTestCase {
         XCTAssertNil(object?["level"])
     }
 
+    func test_N8_storedStarsOutsideOneToThreeDoNotCrash() {
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(nil))
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(0))
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(4))
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(-1))
+        XCTAssertEqual(TonightSchemaV1.StoredStarValue.validated(1), 1)
+        XCTAssertEqual(TonightSchemaV1.StoredStarValue.validated(2), 2)
+        XCTAssertEqual(TonightSchemaV1.StoredStarValue.validated(3), 3)
+
+        let attempt = UUID()
+        let when = Date(timeIntervalSince1970: 1_700_000_000)
+        for stars in [0, 4, -8, 9] {
+            let row = TonightSchemaV1.StoredParentCheck(id: UUID(), attemptID: attempt, stars: stars, checkedAt: when)
+            XCTAssertNil(row.check(), "stored \(stars) must not crash")
+        }
+        for stars in 1...3 {
+            let row = TonightSchemaV1.StoredParentCheck(id: UUID(), attemptID: attempt, stars: stars, checkedAt: when)
+            XCTAssertEqual(row.check()?.stars, stars)
+        }
+    }
+
     func testPhotosAreExcludedFromBackupAndNeedTheParent() throws {
         XCTAssertEqual(LocalProtection.fileProtection, .complete)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

@@ -1,5 +1,6 @@
 import AuthKit
 import Foundation
+import os
 import PracticeKit
 import ProfilesKit
 import SwiftData
@@ -264,6 +265,14 @@ public enum TonightSchemaV1: VersionedSchema {
         }
     }
 
+    /// Stars a parent can award. Nil, 0, 4, and any other stored value are not a reward.
+    public enum StoredStarValue {
+        public static func validated(_ stars: Int?) -> Int? {
+            guard let stars else { return nil }
+            return ParentCheck(attemptID: UUID(), stars: stars)?.stars
+        }
+    }
+
     @Model
     public final class StoredParentCheck {
         @Attribute(.unique) public var id: UUID
@@ -282,12 +291,16 @@ public enum TonightSchemaV1: VersionedSchema {
             self.init(id: check.id, attemptID: check.attemptID, stars: check.stars, checkedAt: check.checkedAt)
         }
 
-        public func check() -> ParentCheck {
-            guard let check = ParentCheck(id: id, attemptID: attemptID, stars: stars, checkedAt: checkedAt) else {
-                preconditionFailure("Stored parent check stars must be 1, 2, or 3")
+        /// A stored count outside 1...3 is dropped. Reading it must not crash the app.
+        public func check() -> ParentCheck? {
+            guard let stars = StoredStarValue.validated(stars) else {
+                Self.repairLog.error("Dropping stored parent-check stars outside 1...3: \(self.stars, privacy: .private)")
+                return nil
             }
-            return check
+            return ParentCheck(id: id, attemptID: attemptID, stars: stars, checkedAt: checkedAt)
         }
+
+        private static let repairLog = Logger(subsystem: "com.tonight.homework", category: "StoredParentCheck")
     }
 
     @Model
