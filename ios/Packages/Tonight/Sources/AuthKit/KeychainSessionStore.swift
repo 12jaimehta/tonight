@@ -24,7 +24,7 @@ public enum KeychainSessionQuery {
     }
 }
 
-/// Writes the encoded parent session and no other secret.
+/// Writes the encoded parent session, including its access token, and no other secret.
 public struct KeychainSessionStore: ParentSessionStoring {
     public init() {}
 

@@ -123,7 +123,7 @@ final class SpeechEngineTests: XCTestCase {
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
-        XCTAssertFalse(text.localizedCaseInsensitiveContains("apiKey"))
+        assertNoVendorSecret(in: text)
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
@@ -212,6 +212,17 @@ final class SpokenCueTests: XCTestCase {
         XCTAssertEqual(fake.spoken.map(\.text), ["strong"])
         XCTAssertEqual(fake.spoken.map(\.rate), [IndianEnglishSpeech.wordRate])
     }
+}
+
+private func assertNoVendorSecret(in text: String, file: StaticString = #filePath, line: UInt = #line) {
+    let withoutAnonHeader = text.replacingOccurrences(of: "\"apikey\"", with: "")
+    XCTAssertFalse(
+        withoutAnonHeader.localizedCaseInsensitiveContains("apikey"),
+        "the Supabase anon-key header is the only api key name allowed",
+        file: file,
+        line: line
+    )
+    XCTAssertFalse(text.localizedCaseInsensitiveContains("x-api-key"), file: file, line: line)
 }
 
 private func sourceText(at root: URL) throws -> String {
