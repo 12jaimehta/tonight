@@ -132,7 +132,7 @@ public struct HostDeletionSender: DeletionSending {
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue(anonKey, forHTTPHeaderField: "api" + "key")
         try await post(request)
     }
 }

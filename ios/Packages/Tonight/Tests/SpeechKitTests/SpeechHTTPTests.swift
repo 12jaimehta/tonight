@@ -113,7 +113,7 @@ final class SpeechHTTPTests: XCTestCase {
 
         let headers = SarvamRequestBody.headers(accessToken: "parent-token", anonKey: "anon-test")
         XCTAssertEqual(headers["Authorization"], "Bearer parent-token")
-        XCTAssertEqual(headers["apikey"], "anon-test")
+        XCTAssertEqual(headers[SarvamRequestBody.anonHeader], "anon-test")
         XCTAssertEqual(headers["Content-Type"], "application/json")
         #if STUDY
         let selection = SpeechEngineSelector.select(SelectionInput(

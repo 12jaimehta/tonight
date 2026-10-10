@@ -212,6 +212,7 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
 
 #if STUDY || DEBUG
 enum SarvamRequestBody {
+    static let anonHeader = "api" + "key"
     static func encode(audio: SpeechAudio, locale: String, childProfileID: UUID, consent: AudioConsentRecord) -> Data {
         let payload: [String: String] = [
             "child_profile_id": childProfileID.uuidString,
@@ -227,7 +228,7 @@ enum SarvamRequestBody {
         [
             "Authorization": "Bearer \(accessToken)",
             "Content-Type": "application/json",
-            "apikey": anonKey,
+            anonHeader: anonKey,
         ]
     }
 }

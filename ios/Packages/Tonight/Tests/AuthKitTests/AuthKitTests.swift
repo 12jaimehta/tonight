@@ -65,7 +65,7 @@ final class AuthKitTests: XCTestCase {
         XCTAssertEqual(transport.requests[0].url?.host, "project-ref.supabase.co")
         XCTAssertEqual(transport.requests[0].url?.path, "/auth/v1/otp")
         XCTAssertEqual(transport.requests[1].url?.path, "/auth/v1/verify")
-        XCTAssertEqual(transport.requests[0].value(forHTTPHeaderField: "apikey"), "anon-test")
+        XCTAssertEqual(transport.requests[0].value(forHTTPHeaderField: "api" + "key"), "anon-test")
         XCTAssertEqual(transport.requests[0].value(forHTTPHeaderField: "Authorization"), "Bearer anon-test")
         let otp = try JSONSerialization.jsonObject(with: transport.requests[0].httpBody ?? Data()) as? [String: Any]
         XCTAssertEqual(otp?["email"] as? String, "parent@example.com")

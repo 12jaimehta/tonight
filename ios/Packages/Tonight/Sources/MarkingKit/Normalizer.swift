@@ -86,7 +86,8 @@ public enum ReadingNormalizer {
                         if case .word(let word) = piece { return word }
                         return nil
                     }.joined(separator: " ")
-                    if let value = NumberWords.parse(phrase) {
+                    let words = phrase.split(separator: " ").map(String.init)
+                    if NumberWords.isCompound(words), let value = NumberWords.parse(phrase) {
                         bestEnd = end
                         best = value
                     }
@@ -349,6 +350,25 @@ enum NumberWords {
     static func isPart(_ word: String) -> Bool {
         if word.contains("-") { return parse(word.replacingOccurrences(of: "-", with: " ")) != nil }
         return small[word] != nil || multipliers[word] != nil
+    }
+
+    /// "twenty five" and "one hundred twenty five" are compounds. "one two three" stays separate words.
+    static func isCompound(_ parts: [String]) -> Bool {
+        guard !parts.isEmpty, parts.allSatisfy(isPart) else { return false }
+        if parts.count == 1 { return true }
+        if parts.contains(where: { multipliers[$0] != nil }) {
+            return parse(parts.joined(separator: " ")) != nil
+        }
+        guard parts.count == 2, let head = small[parts[0]], let tail = small[parts[1]] else { return false }
+        return isTens(head) && isUnit(tail)
+    }
+
+    private static func isTens(_ value: Decimal) -> Bool {
+        [20, 30, 40, 50, 60, 70, 80, 90].contains { $0 == value }
+    }
+
+    private static func isUnit(_ value: Decimal) -> Bool {
+        (1...9).contains { Decimal($0) == value }
     }
 
     static func parse(_ text: String) -> Decimal? {

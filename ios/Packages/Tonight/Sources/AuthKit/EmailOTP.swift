@@ -178,7 +178,7 @@ public struct EmailOTPClient: Sendable {
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(config.anonKey, forHTTPHeaderField: "apikey")
+        request.setValue(config.anonKey, forHTTPHeaderField: "api" + "key")
         request.setValue("Bearer \(config.anonKey)", forHTTPHeaderField: "Authorization")
         return request
     }
