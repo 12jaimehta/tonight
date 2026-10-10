@@ -10,9 +10,13 @@ rate is at most 1/20, the pooled false-reject rate is at most 1/10, and
 every child with an incorrect reference is at most 1/10 false accepts.
 A child with no incorrect reference is n/a and is skipped.
 
-SARVAM only when both engines pass, Sarvam's agreement is at least
-Apple + 5 percentage points, and the paired bootstrap interval of that
-gap sits strictly above zero. Otherwise APPLE when Apple passes, else NO_GO.
+SARVAM when only Sarvam passes. When both pass, SARVAM also needs
+Sarvam's agreement at least Apple + 5 percentage points, a paired
+bootstrap interval strictly above zero, and a false-accept rate no
+worse than Apple. Otherwise APPLE when Apple passes, else NO_GO.
+An object cohort member with no age is OUT_OF_COHORT. The Swift tests
+cover MET-34, MET-36, and MET-13. This script checks the seeded fixtures
+against the checked-in goldens and fails if a golden is missing.
 """
 
 from __future__ import annotations
@@ -237,12 +241,13 @@ def _members(cohort: list) -> dict[str, dict]:
     found: dict[str, dict] = {}
     for item in cohort:
         if isinstance(item, str):
-            found[item] = {"id": item, "age": None, "schoolClass": None}
+            found[item] = {"id": item, "age": None, "schoolClass": None, "demographic": False}
         else:
             found[item["id"]] = {
                 "id": item["id"],
                 "age": item.get("age"),
                 "schoolClass": item.get("schoolClass"),
+                "demographic": True,
             }
     return found
 
@@ -251,6 +256,8 @@ def _screen_cohort(document: dict) -> dict[str, dict]:
     members = _members(document["cohort"])
     for member in members.values():
         age = member["age"]
+        if member["demographic"] and age is None:
+            raise Rejected("OUT_OF_COHORT", member["id"])
         if age is not None and age not in COHORT_AGES:
             raise Rejected("COHORT_REJECTED", member["id"])
         school_class = member["schoolClass"]
@@ -276,9 +283,20 @@ def _screen_cohort(document: dict) -> dict[str, dict]:
     return members
 
 
-def _choose(apple_ok: bool, sarvam_ok: bool, apple_agreement: Ratio, sarvam_agreement: Ratio, gap_low: Ratio) -> str:
+def _choose(
+    apple_ok: bool,
+    sarvam_ok: bool,
+    apple_agreement: Ratio,
+    sarvam_agreement: Ratio,
+    gap_low: Ratio,
+    apple_fa: Ratio,
+    sarvam_fa: Ratio,
+) -> str:
     margin = sarvam_agreement.minus(apple_agreement)
-    if apple_ok and sarvam_ok and margin.ge(Ratio(*SARVAM_MARGIN)) and gap_low.gt(_zero()):
+    fa_not_worse = sarvam_fa.le(apple_fa)
+    if apple_ok and sarvam_ok and margin.ge(Ratio(*SARVAM_MARGIN)) and gap_low.gt(_zero()) and fa_not_worse:
+        return "SARVAM"
+    if sarvam_ok and not apple_ok:
         return "SARVAM"
     if apple_ok:
         return "APPLE"
@@ -314,11 +332,20 @@ def evaluate(document: dict) -> dict:
             **_intervals(groups, children, field),
         }
         point[name] = agreement
+        point[name + "_fa"] = false_accept
         passed[name] = _engine_passes(recordings, field, agreement, false_accept, false_reject)
     gap_low, gap_high = _gap_interval(groups, children)
     return {
         "scoringVersion": SCORING_VERSION,
-        "decision": _choose(passed["apple"], passed["sarvam"], point["apple"], point["sarvam"], gap_low),
+        "decision": _choose(
+            passed["apple"],
+            passed["sarvam"],
+            point["apple"],
+            point["sarvam"],
+            gap_low,
+            point["apple_fa"],
+            point["sarvam_fa"],
+        ),
         "deltaAgreement": point["sarvam"].minus(point["apple"]).text(),
         "deltaCI": [gap_low.text(), gap_high.text()],
         "apple": engines["apple"],
@@ -521,7 +548,7 @@ FIXTURES = {
 
 EXPECTED = {
     "apple_pass": "APPLE",
-    "sarvam_pass": "NO_GO",
+    "sarvam_pass": "SARVAM",
     "no_go": "NO_GO",
     "close_call": "APPLE",
     "exactly_090": "APPLE",
@@ -561,20 +588,20 @@ def main() -> None:
     root.mkdir(parents=True, exist_ok=True)
     failed = False
     for name, builder in FIXTURES.items():
-        source = root / f"{name}.json"
         golden = root / f"{name}.golden.json"
-        if not source.exists():
-            source.write_text(json.dumps(builder(), indent=2) + "\n", encoding="utf-8")
-        loaded = json.loads(source.read_text(encoding="utf-8"))
-        payload = _payload(loaded)
+        payload = _payload(builder())
         decoded = json.loads(payload)
         outcome = decoded.get("decision") or decoded.get("error")
         if outcome != EXPECTED[name]:
             failed = True
             print(f"SPEC {name} got {outcome} want {EXPECTED[name]}", file=sys.stderr)
-        if write or not golden.exists():
-            golden.write_text(payload, encoding="utf-8")
-            print(f"wrote {name} {outcome}")
+        if not golden.exists():
+            if write:
+                golden.write_text(payload, encoding="utf-8")
+                print(f"wrote {name} {outcome}")
+            else:
+                failed = True
+                print(f"MISSING GOLDEN {name}", file=sys.stderr)
             continue
         if golden.read_text(encoding="utf-8") != payload:
             failed = True

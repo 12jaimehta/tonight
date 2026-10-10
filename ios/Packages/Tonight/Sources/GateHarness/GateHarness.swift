@@ -4,8 +4,10 @@ import Foundation
 /// A child-level bootstrap (B = 10_000, fixed seed) supplies the intervals.
 /// Pass uses the pooled ratios: agreement ≥ 9/10, false accepts ≤ 1/20,
 /// false rejects ≤ 1/10, and every scored child ≤ 10% false accepts.
-/// SARVAM requires both passes, a gap of at least 5 percentage points, and a
-/// paired bootstrap interval that sits strictly above zero.
+/// SARVAM when only Sarvam passes. When both pass, SARVAM also needs a gap of
+/// at least 5 percentage points, a paired bootstrap interval strictly above
+/// zero, and a false-accept rate no worse than Apple. Otherwise APPLE if Apple
+/// passes, else NO_GO. A demographic cohort member with no age is rejected.
 public enum GateHarness {
     public static let scoringVersion = 2
     public static let bootstrapCount = 10_000
@@ -50,11 +52,23 @@ public enum GateHarness {
         }
         var members: [String: CohortMember] = [:]
         for member in document.cohort {
-            if let age = member.age, !cohortAges.contains(age) {
-                throw GateHarnessError.cohortRejected(recordingID: member.id)
-            }
-            if let schoolClass = member.schoolClass, !cohortClasses.contains(schoolClass) {
-                throw GateHarnessError.cohortRejected(recordingID: member.id)
+            if member.demographic {
+                guard let age = member.age else {
+                    throw GateHarnessError.outOfCohort(recordingID: member.id)
+                }
+                if !cohortAges.contains(age) {
+                    throw GateHarnessError.cohortRejected(recordingID: member.id)
+                }
+                if let schoolClass = member.schoolClass, !cohortClasses.contains(schoolClass) {
+                    throw GateHarnessError.cohortRejected(recordingID: member.id)
+                }
+            } else {
+                if let age = member.age, !cohortAges.contains(age) {
+                    throw GateHarnessError.cohortRejected(recordingID: member.id)
+                }
+                if let schoolClass = member.schoolClass, !cohortClasses.contains(schoolClass) {
+                    throw GateHarnessError.cohortRejected(recordingID: member.id)
+                }
             }
             members[member.id] = member
         }
@@ -105,8 +119,13 @@ public enum GateHarness {
     }
 
     private static func decide(apple: EngineReport, sarvam: EngineReport, delta: Rational, deltaCI: ClosedRangePair) -> GateDecision {
-        let beats = delta >= sarvamMargin && deltaCI.lower > Rational(0, 1)
+        let beats = delta >= sarvamMargin
+            && deltaCI.lower > Rational(0, 1)
+            && sarvam.falseAcceptRate <= apple.falseAcceptRate
         if apple.passesBar && sarvam.passesBar && beats {
+            return .sarvam
+        }
+        if sarvam.passesBar && !apple.passesBar {
             return .sarvam
         }
         if apple.passesBar { return .apple }
@@ -318,11 +337,29 @@ public struct CohortMember: Codable, Equatable, Sendable {
     public var id: String
     public var age: Int?
     public var schoolClass: String?
+    /// True when this child came from an object cohort entry. A missing age is then an error.
+    /// A bare string id is a scoring fixture and does not screen age.
+    public var demographic: Bool
 
-    public init(id: String, age: Int? = nil, schoolClass: String? = nil) {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case age
+        case schoolClass
+    }
+
+    public init(id: String, age: Int? = nil, schoolClass: String? = nil, demographic: Bool = false) {
         self.id = id
         self.age = age
         self.schoolClass = schoolClass
+        self.demographic = demographic
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        age = try container.decodeIfPresent(Int.self, forKey: .age)
+        schoolClass = try container.decodeIfPresent(String.self, forKey: .schoolClass)
+        demographic = true
     }
 }
 

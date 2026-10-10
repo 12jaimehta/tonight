@@ -28,7 +28,7 @@ final class GateHarnessTests: XCTestCase {
     func test_HAR03_decisionIsOneOfThreeCases() throws {
         XCTAssertEqual(GateDecision.allCases.map(\.rawValue), ["APPLE", "SARVAM", "NO_GO"])
         XCTAssertEqual(try report("apple_pass").decision, .apple)
-        XCTAssertEqual(try report("sarvam_pass").decision, .noGo)
+        XCTAssertEqual(try report("sarvam_pass").decision, .sarvam)
         XCTAssertEqual(try report("no_go").decision, .noGo)
     }
 
@@ -119,10 +119,48 @@ final class GateHarnessTests: XCTestCase {
         XCTAssertFalse(try report("apple_pass").sarvam.passesBar)
     }
 
-    func test_MET24_onlySarvamClearingTheBarIsNoGo() throws {
-        XCTAssertEqual(try report("sarvam_pass").decision, .noGo)
+    func test_MET36_appleFailsAndSarvamPassesSelectsSarvam() throws {
+        let report = try report("met36")
+        XCTAssertEqual(report.apple.agreement, Rational(17, 20))
+        XCTAssertEqual(report.sarvam.agreement, Rational(97, 100))
+        XCTAssertFalse(report.apple.passesBar)
+        XCTAssertTrue(report.sarvam.passesBar)
+        XCTAssertEqual(report.decision, .sarvam)
+    }
+
+    func test_MET36b_swappedSarvamPassFixtureSelectsSarvam() throws {
+        XCTAssertEqual(try report("sarvam_pass").decision, .sarvam)
         XCTAssertTrue(try report("sarvam_pass").sarvam.passesBar)
         XCTAssertFalse(try report("sarvam_pass").apple.passesBar)
+    }
+
+    func test_MET34_worseSarvamFalseAcceptStaysApple() throws {
+        let report = try report("met34")
+        XCTAssertTrue(report.apple.passesBar)
+        XCTAssertTrue(report.sarvam.passesBar)
+        XCTAssertEqual(report.deltaAgreement, Rational(3, 50))
+        XCTAssertGreaterThan(report.deltaCI.lower, Rational(0, 1))
+        XCTAssertEqual(report.apple.falseAcceptRate, Rational(0, 1))
+        XCTAssertEqual(report.sarvam.falseAcceptRate, Rational(1, 20))
+        XCTAssertGreaterThan(report.sarvam.falseAcceptRate, report.apple.falseAcceptRate)
+        XCTAssertEqual(report.decision, .apple)
+    }
+
+    func test_MET13_childWithNoAgeIsRejected() {
+        XCTAssertThrowsError(try report("met13")) { error in
+            XCTAssertEqual(error as? GateHarnessError, .outOfCohort(recordingID: "ageless"))
+        }
+    }
+
+    func test_missingGoldenFailsTheRun() {
+        let invented = Bundle.module.url(forResource: "not_a_golden.golden", withExtension: "json", subdirectory: "Fixtures")
+        if invented != nil {
+            XCTFail("a missing golden must not be treated as present")
+        }
+        for name in FixtureCatalog.requiredGoldens {
+            let url = Bundle.module.url(forResource: "\(name).golden", withExtension: "json", subdirectory: "Fixtures")
+            XCTAssertNotNil(url, "missing golden \(name) fails the run")
+        }
     }
 
     func test_MET25_noGoWhenNeitherClearsTheBar() throws {
@@ -338,7 +376,13 @@ final class GateHarnessTests: XCTestCase {
     }
 
     private func load(_ name: String) throws -> GateDocument {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"))
+        if let built = FixtureCatalog.build(name) {
+            return built
+        }
+        let url = try XCTUnwrap(
+            Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"),
+            "missing fixture \(name) fails the run"
+        )
         return try JSONDecoder().decode(GateDocument.self, from: Data(contentsOf: url))
     }
 
@@ -364,6 +408,193 @@ final class GateHarnessTests: XCTestCase {
         XCTAssertEqual(actual.falseAcceptCI.upper.text, expected.falseAcceptCI[1], name)
         let perChild = actual.perChildFalseAccept.mapValues { $0?.text ?? "n/a" }
         XCTAssertEqual(perChild, expected.perChildFalseAccept, name)
+    }
+}
+
+/// Seeds for the large cohorts. The expansion rules are in Fixtures/SCHEMA.md.
+private enum FixtureCatalog {
+    static let requiredGoldens = [
+        "apple_pass", "sarvam_pass", "no_go", "close_call",
+        "exactly_090", "exactly_plus_5pp", "ci_includes_zero",
+        "per_child_fa_cap", "per_child_fa_exact",
+        "unpaired", "out_of_cohort", "age_reject", "class_reject",
+    ]
+
+    static func build(_ name: String) -> GateDocument? {
+        switch name {
+        case "apple_pass": return applePass(swap: false)
+        case "sarvam_pass": return applePass(swap: true)
+        case "no_go": return rows(children: 4, items: 10, appleCorrect: 4, sarvamCorrect: 4)
+        case "close_call": return rows(children: 4, items: 1000, appleCorrect: 900, sarvamCorrect: 901)
+        case "exactly_090": return exactlyNinety()
+        case "exactly_plus_5pp": return rows(children: 4, items: 20, appleCorrect: 18, sarvamCorrect: 19)
+        case "ci_includes_zero": return ciIncludesZero()
+        case "per_child_fa_cap": return perChildCap()
+        case "per_child_fa_exact": return perChildExact()
+        case "unpaired": return unpaired()
+        case "out_of_cohort": return outOfCohort()
+        case "age_reject": return demographic(age: 9, schoolClass: "2")
+        case "class_reject": return demographic(age: 7, schoolClass: "5")
+        default: return nil
+        }
+    }
+
+    private static func rows(children: Int, items: Int, appleCorrect: Int, sarvamCorrect: Int, reference: Bool = true) -> GateDocument {
+        var cohort: [String] = []
+        var recordings: [Recording] = []
+        for childIndex in 0..<children {
+            let child = String(format: "c%02d", childIndex)
+            cohort.append(child)
+            for item in 0..<items {
+                recordings.append(Recording(
+                    id: "\(child)-\(item)",
+                    childID: child,
+                    referenceCorrect: reference,
+                    appleCorrect: item < appleCorrect,
+                    sarvamCorrect: item < sarvamCorrect
+                ))
+            }
+        }
+        return GateDocument(cohort: cohort, recordings: recordings)
+    }
+
+    private static func applePass(swap: Bool) -> GateDocument {
+        var cohort: [String] = []
+        var recordings: [Recording] = []
+        for childIndex in 0..<8 {
+            let child = "c\(childIndex)"
+            cohort.append(child)
+            for item in 0..<8 {
+                let reference = item < 6
+                let apple = swap ? true : reference
+                let sarvam = swap ? reference : true
+                recordings.append(Recording(
+                    id: "\(child)-\(item)",
+                    childID: child,
+                    referenceCorrect: reference,
+                    appleCorrect: apple,
+                    sarvamCorrect: sarvam
+                ))
+            }
+        }
+        return GateDocument(cohort: cohort, recordings: recordings)
+    }
+
+    private static func exactlyNinety() -> GateDocument {
+        var cohort: [String] = []
+        var recordings: [Recording] = []
+        for childIndex in 0..<20 {
+            let child = String(format: "c%02d", childIndex)
+            cohort.append(child)
+            let correct = childIndex % 2 == 0 ? 47 : 43
+            for item in 0..<50 {
+                let heard = item < correct
+                recordings.append(Recording(
+                    id: "\(child)-\(item)",
+                    childID: child,
+                    referenceCorrect: true,
+                    appleCorrect: heard,
+                    sarvamCorrect: heard
+                ))
+            }
+        }
+        return GateDocument(cohort: cohort, recordings: recordings)
+    }
+
+    private static func ciIncludesZero() -> GateDocument {
+        var cohort: [String] = []
+        var recordings: [Recording] = []
+        for childIndex in 0..<10 {
+            let child = String(format: "c%02d", childIndex)
+            cohort.append(child)
+            let sarvamCorrect = childIndex == 9 ? 10 : 20
+            for item in 0..<20 {
+                recordings.append(Recording(
+                    id: "\(child)-\(item)",
+                    childID: child,
+                    referenceCorrect: true,
+                    appleCorrect: item < 18,
+                    sarvamCorrect: item < sarvamCorrect
+                ))
+            }
+        }
+        return GateDocument(cohort: cohort, recordings: recordings)
+    }
+
+    private static func perChildCap() -> GateDocument {
+        var recordings: [Recording] = []
+        for item in 0..<19 {
+            recordings.append(Recording(
+                id: "good-\(item)",
+                childID: "good",
+                referenceCorrect: false,
+                appleCorrect: false,
+                sarvamCorrect: false
+            ))
+        }
+        recordings.append(Recording(
+            id: "over-0",
+            childID: "over",
+            referenceCorrect: false,
+            appleCorrect: true,
+            sarvamCorrect: true
+        ))
+        return GateDocument(cohort: ["good", "over"], recordings: recordings)
+    }
+
+    private static func perChildExact() -> GateDocument {
+        var cohort: [String] = []
+        var recordings: [Recording] = []
+        for childIndex in 0..<10 {
+            let child = String(format: "c%02d", childIndex)
+            cohort.append(child)
+            for item in 0..<10 {
+                let falseAccept = childIndex == 0 && item == 0
+                recordings.append(Recording(
+                    id: "\(child)-\(item)",
+                    childID: child,
+                    referenceCorrect: false,
+                    appleCorrect: falseAccept,
+                    sarvamCorrect: falseAccept
+                ))
+            }
+        }
+        return GateDocument(cohort: cohort, recordings: recordings)
+    }
+
+    private static func unpaired() -> GateDocument {
+        var document = rows(children: 1, items: 1, appleCorrect: 1, sarvamCorrect: 1)
+        let row = document.recordings[0]
+        document.recordings[0] = Recording(
+            id: row.id,
+            childID: row.childID,
+            referenceCorrect: row.referenceCorrect,
+            appleCorrect: row.appleCorrect,
+            sarvamCorrect: nil
+        )
+        return document
+    }
+
+    private static func outOfCohort() -> GateDocument {
+        var document = rows(children: 1, items: 1, appleCorrect: 1, sarvamCorrect: 1)
+        document.cohort = [CohortMember(id: "someone-else")]
+        return document
+    }
+
+    private static func demographic(age: Int, schoolClass: String) -> GateDocument {
+        var document = rows(children: 1, items: 1, appleCorrect: 1, sarvamCorrect: 1)
+        document.cohort = [CohortMember(id: "c00", age: age, schoolClass: schoolClass, demographic: true)]
+        let row = document.recordings[0]
+        document.recordings[0] = Recording(
+            id: row.id,
+            childID: row.childID,
+            referenceCorrect: row.referenceCorrect,
+            appleCorrect: row.appleCorrect,
+            sarvamCorrect: row.sarvamCorrect,
+            age: age,
+            schoolClass: schoolClass
+        )
+        return document
     }
 }
 
