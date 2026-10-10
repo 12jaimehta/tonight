@@ -283,7 +283,8 @@ final class SpeechPolicyTests: XCTestCase {
         #else
         XCTAssertNil(outcome.fallbackReason)
         XCTAssertEqual(outcome.bytesSent, 0)
-        XCTAssertEqual(await transport.posts.count, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
         #endif
     }
 

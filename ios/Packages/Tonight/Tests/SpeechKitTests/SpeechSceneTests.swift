@@ -9,7 +9,8 @@ final class SpeechSceneTests: XCTestCase {
         let scene = SpeechSceneController(runner: runner(transport))
         await scene.sceneDidChange(isActive: false)
         XCTAssertTrue(scene.suspended)
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
     }
 
     func test_LAT10_backgroundDoesNotQueueARetry() async {
@@ -21,7 +22,8 @@ final class SpeechSceneTests: XCTestCase {
             input: input(flagOn: false, record: record(scopes: [.onDevice])),
             attemptID: UUID()
         )
-        XCTAssertEqual(await transport.posts.count, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
         XCTAssertEqual(outcome.bytesSent, 0)
     }
 
@@ -31,7 +33,8 @@ final class SpeechSceneTests: XCTestCase {
         await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: true))
         await scene.apply(SpeechWatch(childID: child, consentActive: false, flagOn: true))
         XCTAssertTrue(scene.deletionRequested)
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
     }
 
     func test_CG21_flagOffCancelsTheUpload() async {
@@ -40,7 +43,8 @@ final class SpeechSceneTests: XCTestCase {
         await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: true))
         await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: false))
         XCTAssertTrue(scene.deletionRequested)
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
     }
 
     func test_CG25_childChangeCancelsTheUpload() async {
@@ -49,7 +53,8 @@ final class SpeechSceneTests: XCTestCase {
         await scene.apply(SpeechWatch(childID: child, consentActive: true, flagOn: true))
         await scene.apply(SpeechWatch(childID: UUID(), consentActive: true, flagOn: true))
         XCTAssertTrue(scene.deletionRequested)
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
     }
 
     private func runner(_ transport: SpyTransport) -> SpeechAttemptRunner {

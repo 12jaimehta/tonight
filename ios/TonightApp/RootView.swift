@@ -104,7 +104,7 @@ struct ChildHomeView: View {
                     )
                     .accessibilityIdentifier("subject.\(subject.id)")
                 }
-                Button("Parent", action: { presentParent() })
+                Button("Parent", action: onParent)
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("parent.button")
                 if !uploadStatus.isEmpty {
