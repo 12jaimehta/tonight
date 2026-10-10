@@ -23,7 +23,7 @@ jobs:
 
       - name: Test sarvam-proxy
         working-directory: backend/supabase/functions/sarvam-proxy
-        run: deno test --deny-net
+        run: deno test --deny-net --allow-read
 
       - name: Test storage purge
         run: |

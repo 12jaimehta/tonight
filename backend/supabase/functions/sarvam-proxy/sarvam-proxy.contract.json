@@ -1,0 +1,33 @@
+{
+  "name": "sarvam-proxy",
+  "request": {
+    "method": "POST",
+    "path": "/functions/v1/sarvam-proxy",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer <parent session access token>",
+      "apikey": "<supabase anon key>"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["child_profile_id", "audio_base64", "locale", "consent_record_id", "consent_version"],
+      "properties": {
+        "child_profile_id": { "type": "string", "format": "uuid" },
+        "audio_base64": { "type": "string" },
+        "locale": { "type": "string", "example": "en-IN" },
+        "consent_record_id": { "type": "string", "format": "uuid" },
+        "consent_version": { "type": "string", "example": "2026-10-09" }
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "required": ["transcript"],
+    "properties": {
+      "transcript": { "type": "string" },
+      "latency_ms": { "type": "number" },
+      "cost": { "type": "number" }
+    }
+  }
+}
