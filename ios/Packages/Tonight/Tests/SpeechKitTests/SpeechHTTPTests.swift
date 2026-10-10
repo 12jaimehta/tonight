@@ -75,6 +75,65 @@ final class SpeechHTTPTests: XCTestCase {
         #endif
     }
 
+    #if STUDY || DEBUG
+    func test_CG06_NET01_LAT02_requestMatchesTheContract() throws {
+        let fixtureURL = try XCTUnwrap(Bundle.module.url(forResource: "sarvam-proxy.contract", withExtension: "json", subdirectory: "Fixtures"))
+        let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: fixtureURL)) as? [String: Any]
+        let request = fixture?["request"] as? [String: Any]
+        let bodySpec = request?["body"] as? [String: Any]
+        let required = try XCTUnwrap(bodySpec?["required"] as? [String])
+        XCTAssertEqual(required, ["child_profile_id", "audio_base64", "locale", "consent_record_id", "consent_version"])
+        let headerSpec = try XCTUnwrap(request?["headers"] as? [String: String])
+        XCTAssertTrue(headerSpec["Authorization"]?.hasPrefix("Bearer ") == true)
+        XCTAssertNotNil(headerSpec["apikey"])
+
+        let consent = AudioConsentRecord(
+            id: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+            parentID: "parent",
+            childProfileID: child,
+            scopes: [.onDevice, .server],
+            tappedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            method: "screen",
+            backendConfirmed: true
+        )
+        let data = SarvamRequestBody.encode(
+            audio: SpeechAudio(samples: Data("clip".utf8)),
+            locale: "en-IN",
+            childProfileID: child,
+            consent: consent
+        )
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
+        XCTAssertEqual(Set(body.keys), Set(required))
+        XCTAssertEqual(body["child_profile_id"], child.uuidString)
+        XCTAssertEqual(body["locale"], "en-IN")
+        XCTAssertEqual(body["consent_record_id"], consent.id.uuidString)
+        XCTAssertEqual(body["consent_version"], consent.version)
+        XCTAssertFalse(body["audio_base64"]?.isEmpty ?? true)
+        XCTAssertNil(body["audioBase64"])
+
+        let headers = SarvamRequestBody.headers(accessToken: "parent-token", anonKey: "anon-test")
+        XCTAssertEqual(headers["Authorization"], "Bearer parent-token")
+        XCTAssertEqual(headers["apikey"], "anon-test")
+        XCTAssertEqual(headers["Content-Type"], "application/json")
+        #if STUDY
+        let selection = SpeechEngineSelector.select(SelectionInput(
+            studyBuild: true,
+            flagOn: true,
+            online: true,
+            sessionValid: true,
+            childProfileID: child,
+            record: consent,
+            accessToken: "parent-token"
+        ))
+        XCTAssertEqual(selection.engine, .sarvam)
+        XCTAssertTrue(selection.maySendAudio)
+        XCTAssertTrue(ServerSpeechBuild.isStudyBuild)
+        #else
+        XCTAssertFalse(ServerSpeechBuild.isStudyBuild)
+        #endif
+    }
+    #endif
+
     private func runner(_ transport: ScriptedTransport, _ onDevice: FakeSpeechEngine) -> SpeechAttemptRunner {
         SpeechAttemptRunner(transport: transport, onDevice: onDevice, sleeper: NeverSleeper())
     }

@@ -210,17 +210,25 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
     }
 }
 
-#if STUDY
+#if STUDY || DEBUG
 enum SarvamRequestBody {
-    static func encode(audio: SpeechAudio, locale: String, consent: AudioConsentRecord) -> Data {
+    static func encode(audio: SpeechAudio, locale: String, childProfileID: UUID, consent: AudioConsentRecord) -> Data {
         let payload: [String: String] = [
+            "child_profile_id": childProfileID.uuidString,
+            "audio_base64": audio.samples.base64EncodedString(),
             "locale": locale,
-            "audioBase64": audio.samples.base64EncodedString(),
-            "contentType": "audio/wav",
-            "consentRecordId": consent.id.uuidString,
-            "consentVersion": consent.version,
+            "consent_record_id": consent.id.uuidString,
+            "consent_version": consent.version,
         ]
         return try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    }
+
+    static func headers(accessToken: String, anonKey: String) -> [String: String] {
+        [
+            "Authorization": "Bearer \(accessToken)",
+            "Content-Type": "application/json",
+            "apikey": anonKey,
+        ]
     }
 }
 #endif
@@ -299,11 +307,11 @@ public struct SpeechAttemptRunner: Sendable {
         } catch {
             return await fallbackOnDevice(audio: audio, input: input, attemptID: attemptID, locale: locale, reason: .serverError, bytesSent: 0)
         }
-        let body = SarvamRequestBody.encode(audio: audio, locale: locale, consent: record)
+        let body = SarvamRequestBody.encode(audio: audio, locale: locale, childProfileID: input.childProfileID, consent: record)
         let request = ProxyRequest(
             url: url,
             body: body,
-            headers: ["Content-Type": "application/json"],
+            headers: SarvamRequestBody.headers(accessToken: input.accessToken, anonKey: TonightEndpoints.anonKey),
             timeout: OnDeviceRequestPolicy.serverTimeout
         )
         let post = Task { try await transport.post(request) }

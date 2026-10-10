@@ -205,7 +205,8 @@ public struct SelectionInput: Sendable, Equatable {
         sessionValid: Bool,
         onDeviceAvailable: Bool = true,
         childProfileID: UUID,
-        record: AudioConsentRecord?
+        record: AudioConsentRecord?,
+        accessToken: String = ""
     ) {
         self.studyBuild = studyBuild
         self.flagOn = flagOn
@@ -214,7 +215,11 @@ public struct SelectionInput: Sendable, Equatable {
         self.onDeviceAvailable = onDeviceAvailable
         self.childProfileID = childProfileID
         self.record = record
+        self.accessToken = accessToken
     }
+
+    /// Parent session access token sent as Authorization: Bearer. Empty until a session exists.
+    public var accessToken: String = ""
 }
 
 public enum SelectionReason: String, Codable, Sendable, Equatable {

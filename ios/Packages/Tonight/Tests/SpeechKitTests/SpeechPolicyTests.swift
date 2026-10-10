@@ -48,7 +48,8 @@ final class SpeechPolicyTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/SpeechKit/SpeechAttemptRunner.swift"))
-        XCTAssertTrue(source.contains("#if STUDY\nenum SarvamRequestBody"))
+        XCTAssertTrue(source.contains("#if STUDY || DEBUG\nenum SarvamRequestBody"))
+        XCTAssertTrue(source.contains("#if STUDY\n            return await transcribeServer"))
     }
 
     func testCG07_withdrawnServer_isOnDeviceEvenOffline() {

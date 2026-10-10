@@ -1,6 +1,8 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+let speechSwiftSettings: [SwiftSetting] = Context.environment["TONIGHT_STUDY_BUILD"] == "1" ? [.define("STUDY")] : []
+
 let package = Package(
     name: "Tonight",
     platforms: [.iOS(.v17)],
@@ -29,8 +31,12 @@ let package = Package(
             resources: [.copy("Fixtures")]
         ),
 
-        .target(name: "SpeechKit"),
-        .testTarget(name: "SpeechKitTests", dependencies: ["SpeechKit"]),
+        .target(name: "SpeechKit", swiftSettings: speechSwiftSettings),
+        .testTarget(
+            name: "SpeechKitTests",
+            dependencies: ["SpeechKit"],
+            resources: [.copy("Fixtures")]
+        ),
 
         .target(name: "AuthKit"),
         .testTarget(name: "AuthKitTests", dependencies: ["AuthKit"]),
