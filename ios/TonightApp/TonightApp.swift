@@ -27,8 +27,37 @@ enum TonightComposition {
     static let sessionStore: any ParentSessionStoring = KeychainSessionStore()
 
     @MainActor
-    static func makeModel(consentCenter: ConsentCenter? = nil, emailOTP: EmailOTPClient? = nil) -> TonightModel {
-        TonightModel(sessionStore: sessionStore, consentCenter: consentCenter, emailOTP: emailOTP)
+    static func makeModel(
+        consentCenter: ConsentCenter? = nil,
+        serverWithdrawal: ServerWithdrawalClient? = nil,
+        emailOTP: EmailOTPClient? = nil
+    ) -> TonightModel {
+        TonightModel(
+            sessionStore: sessionStore,
+            consentCenter: consentCenter,
+            serverWithdrawal: serverWithdrawal,
+            emailOTP: emailOTP
+        )
+    }
+
+    static func makeServerWithdrawal() -> ServerWithdrawalClient? {
+        guard let config = SupabaseSpeechConfig.load(from: .main), !config.anonKey.isEmpty else { return nil }
+        let base = (try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? FileManager.default.temporaryDirectory
+        return ServerWithdrawalClient(
+            baseURL: config.baseURL,
+            anonKey: config.anonKey,
+            accessToken: { (try? KeychainAccessTokenStore().load()) ?? "" },
+            send: { request in
+                let (_, response) = try await URLSession.shared.data(for: request)
+                return (response as? HTTPURLResponse)?.statusCode ?? 0
+            },
+            queueFile: base.appendingPathComponent("Tonight/server-withdrawal-queue.json")
+        )
     }
 
     static func makeConsentCenter() throws -> ConsentCenter {

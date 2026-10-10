@@ -10,7 +10,11 @@ struct RootView: View {
 
     init(consentCenter: ConsentCenter, emailOTP: EmailOTPClient? = nil) {
         self.consentCenter = consentCenter
-        _model = State(initialValue: TonightComposition.makeModel(consentCenter: consentCenter, emailOTP: emailOTP))
+        _model = State(initialValue: TonightComposition.makeModel(
+            consentCenter: consentCenter,
+            serverWithdrawal: TonightComposition.makeServerWithdrawal(),
+            emailOTP: emailOTP
+        ))
     }
     @State private var uploadStatus = ""
     @State private var speechScene = SpeechSceneController(runner: TonightSpeechScene.makeRunner())
@@ -215,6 +219,7 @@ struct RootView: View {
             refreshSpeechSession(childID: model.child?.id)
             Task { await speechScene.apply(speechSession.watch) }
             Task { await consentCenter.flush(at: Date()) }
+            Task { await model.serverWithdrawal?.flush() }
             guard stubUpload else { return }
             uploadStatus = "Uploading"
         }

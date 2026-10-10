@@ -427,6 +427,7 @@ final class TonightModel {
     var withdrawalEpoch = 0
     let consentStore = InMemoryAdultConsentStore()
     let consentCenter: ConsentCenter?
+    var serverWithdrawal: ServerWithdrawalClient?
     let emailOTP: EmailOTPClient?
     let sessionStore: any ParentSessionStoring
     let speech: any SpeechSynthesizing
@@ -435,11 +436,13 @@ final class TonightModel {
         sessionStore: any ParentSessionStoring = KeychainSessionStore(),
         speech: any SpeechSynthesizing = IndianEnglishSpeech(),
         consentCenter: ConsentCenter? = nil,
+        serverWithdrawal: ServerWithdrawalClient? = nil,
         emailOTP: EmailOTPClient? = nil
     ) {
         self.sessionStore = sessionStore
         self.speech = speech
         self.consentCenter = consentCenter
+        self.serverWithdrawal = serverWithdrawal
         self.emailOTP = emailOTP
         let arguments = ProcessInfo.processInfo.arguments
         gate = GateModel(fixed: arguments.contains("-TonightFixedGate"))
@@ -726,7 +729,9 @@ final class TonightModel {
                     backendConfirmed: false
                 ))
             }
+            let consentID = consentCenter.record(for: childID)?.id
             _ = try await consentCenter.withdraw(childProfileID: childID, at: Date())
+            await serverWithdrawal?.submit(childID: childID, consentRecordID: consentID)
             withdrawalNotice = "Consent withdrawn"
             confirmingWithdrawal = false
             withdrawalEpoch += 1
