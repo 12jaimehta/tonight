@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Persistent per-child consent, audit log, audio, and the server deletion queue.
 /// Withdrawal erases local speech data before it returns, then queues the server delete.
