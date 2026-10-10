@@ -125,7 +125,9 @@ def _bootstrap_ci(
     for _ in range(B):
         sample: list[dict[str, Any]] = []
         for _pick in range(len(children)):
-            child = children[generator.next_u32() % len(children)]
+            draw = generator.next_u32()
+            mixed = (draw ^ (draw >> 16)) & 0xFFFFFFFF
+            child = children[mixed % len(children)]
             sample.extend(groups[child])
         counts = _counts(sample, engine)
         agreements.append(_rate(counts["agreements"], counts["paired"]))

@@ -98,7 +98,9 @@ public enum GateHarness {
             var sample: [Recording] = []
             sample.reserveCapacity(children.count)
             for _ in children {
-                let child = children[Int(generator.next() % UInt64(children.count))]
+                let draw = generator.next()
+                let mixed = draw ^ (draw >> 16)
+                let child = children[Int(mixed % UInt64(children.count))]
                 sample.append(contentsOf: groups[child] ?? [])
             }
             let counts = count(sample, engine: engine)

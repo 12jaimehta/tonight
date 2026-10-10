@@ -287,13 +287,14 @@ public enum SpeechEngineSelector {
     }
 
     private static func onDeviceReason(_ input: SelectionInput, record: AudioConsentRecord) -> SelectionReason {
-        if !ServerSpeechBuild.isStudyBuild { return .releaseBuild }
         if !input.flagOn { return .flagOff }
         if !input.sessionValid { return .sessionExpired }
         if !input.online { return .offline }
         if !record.backendConfirmed { return .backendUnconfirmed }
         if record.version != AudioConsentRecord.currentVersion { return .staleConsentVersion }
         if record.withdrawnScopes.contains(.server) { return .serverWithdrawn }
+        if !record.scopeIsActive(.server) { return .onDeviceOnly }
+        if !ServerSpeechBuild.isStudyBuild { return .releaseBuild }
         return .onDeviceOnly
     }
 }
