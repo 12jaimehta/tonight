@@ -29,6 +29,9 @@ def main() -> None:
         raise SystemExit("missing deletion_sla_alert")
     if "> interval '24 hours'" not in combined:
         raise SystemExit("missing the 24 hour SLA comparison")
+    purge = latest_function(combined, "purge_due_study_audio")
+    if "delete from storage.objects" in purge.lower():
+        raise SystemExit("purge_due_study_audio still deletes storage metadata in SQL")
     print("ok deletion SLA")
 
 
