@@ -43,6 +43,36 @@ final class ScoringCSVTests: XCTestCase {
         }
     }
 
+    /// P0-2 and P0-3. These rows failed when a decimal point or the letter e forced needs_review.
+    func test_TC015_TC029_TC032_TC033_TC034_TC036_TC037_TC039_TC040_TC047_TC048_TC060_TC061_TC062_TC063_TC064_TC065_TC066_TC068_TC069_TC077() throws {
+        let ids: Set<String> = [
+            "TC-015", "TC-029", "TC-032", "TC-033", "TC-034", "TC-036", "TC-037", "TC-039",
+            "TC-040", "TC-047", "TC-048", "TC-060", "TC-061", "TC-062", "TC-063", "TC-064",
+            "TC-065", "TC-066", "TC-068", "TC-069", "TC-077",
+        ]
+        let url = try XCTUnwrap(
+            Bundle.module.url(forResource: "scoring_test_cases", withExtension: "csv", subdirectory: "Fixtures")
+        )
+        let rows = try parseCSV(String(contentsOf: url, encoding: .utf8))
+        let cases = rows.dropFirst().filter { ids.contains($0.first ?? "") }
+        XCTAssertEqual(cases.count, ids.count)
+        for columns in cases {
+            let id = columns[0]
+            let score = AnswerScorer.score(
+                expected: columns[4],
+                child: columns[5],
+                questionType: columns[2],
+                settings: columns[3]
+            )
+            XCTAssertEqual(score.result.rawValue, columns[6], id)
+            if id == "TC-038" {
+                XCTAssertEqual(score.result, .needsReview, "3,5 stays needs_review")
+            }
+        }
+        let comma = AnswerScorer.score(expected: "3.5", child: "3,5", questionType: "decimal", settings: "")
+        XCTAssertEqual(comma.result, .needsReview, "TC-038 3,5 stays needs_review")
+    }
+
     func testDecimalCommaDoesNotDependOnAPassedLocale() {
         let german = AnswerScorer.score(expected: "3.5", child: "3,5", questionType: "decimal", settings: "locale=de_DE")
         let india = AnswerScorer.score(expected: "3.5", child: "3,5", questionType: "decimal", settings: "locale=en_IN")

@@ -394,8 +394,8 @@ public enum AnswerScorer {
 
     private static func looksScientific(_ raw: String) -> Bool {
         let text = normalizeDigits(raw).lowercased().filter { !$0.isWhitespace }
-        // 1e3 and 6.02e23. Words such as "apples" or "litres" are not scientific notation.
-        return text.range(of: #"\d+(?:\.\d+)?e[+-]?\d+"#, options: .regularExpression) != nil
+        // The whole answer must be scientific notation. "3 litres" and "7 apples" are not.
+        return text.range(of: #"^[+-]?\d+(\.\d+)?e[+-]?\d+$"#, options: .regularExpression) != nil
     }
 
     private static func fractionDigits(_ raw: String) -> Int {
