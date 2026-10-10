@@ -1,11 +1,60 @@
 import Foundation
 import os
 
+/// URL and anon key for the Supabase project. The app loads these from Info.plist.
+/// Tests call `use(_:)` so they do not need the app bundle.
+public struct SupabaseSpeechConfig: Sendable, Equatable {
+    public var baseURL: URL
+    public var anonKey: String
+
+    public init(baseURL: URL, anonKey: String) {
+        self.baseURL = baseURL
+        self.anonKey = anonKey
+    }
+
+    public static func load(from bundle: Bundle) -> SupabaseSpeechConfig? {
+        guard
+            let urlString = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+            let baseURL = URL(string: urlString),
+            let host = baseURL.host,
+            !host.isEmpty,
+            let anonKey = bundle.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String
+        else { return nil }
+        return SupabaseSpeechConfig(baseURL: baseURL, anonKey: anonKey)
+    }
+}
+
 /// The only network host the app may contact.
 /// `project-ref` stands in for the real Supabase project ref. The Mumbai project is not created yet.
 public enum TonightEndpoints {
-    public static let proxyBaseURL = URL(string: "https://project-ref.supabase.co")!
-    public static let allowedHosts: Set<String> = ["project-ref.supabase.co"]
+    private static let config = OSAllocatedUnfairLock<SupabaseSpeechConfig?>(initialState: nil)
+
+    public static func use(_ config: SupabaseSpeechConfig) {
+        self.config.withLock { $0 = config }
+    }
+
+    public static func use(bundle: Bundle) {
+        guard let loaded = SupabaseSpeechConfig.load(from: bundle) else { return }
+        use(loaded)
+    }
+
+    public static var proxyBaseURL: URL {
+        guard let url = config.withLock({ $0?.baseURL }) else {
+            preconditionFailure("Call TonightEndpoints.use(_:) before opening the proxy")
+        }
+        return url
+    }
+
+    public static var anonKey: String {
+        config.withLock { $0?.anonKey ?? "" }
+    }
+
+    public static var allowedHosts: Set<String> {
+        guard let host = config.withLock({ $0?.baseURL.host?.lowercased() }), !host.isEmpty else {
+            return []
+        }
+        return [host]
+    }
 
     public static let deniedHostFragments = [
         "fire" + "base", "googleapis.com", "google-analytics", "crashlytics",
