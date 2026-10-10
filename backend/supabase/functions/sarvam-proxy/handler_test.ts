@@ -1,13 +1,26 @@
 import { handleSarvamProxy, logLine, type ProxyDeps, type ProxyLog } from "./handler.ts";
 
 const CHILD = "11111111-1111-4111-8111-111111111111";
+const CONSENT = "22222222-2222-4222-8222-222222222222";
+const CONSENT_VERSION = "2026-10-09";
 const AUDIO_TEXT = "AUDIO_MARKER_DO_NOT_LOG";
 const TRANSCRIPT = "TRANSCRIPT_MARKER_DO_NOT_LOG";
 const AUDIO_BASE64 = btoa(AUDIO_TEXT);
 
+function contractBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    child_profile_id: CHILD,
+    audio_base64: AUDIO_BASE64,
+    locale: "en-IN",
+    consent_record_id: CONSENT,
+    consent_version: CONSENT_VERSION,
+    ...extra,
+  };
+}
+
 Deno.test("missing JWT is rejected and does not call Sarvam", async () => {
   const seen = tracker();
-  const response = await handleSarvamProxy(request(null, { audio_base64: AUDIO_BASE64 }), seen.deps);
+  const response = await handleSarvamProxy(request(null, contractBody()), seen.deps);
   assertEquals(response.status, 401);
   assertEquals(await response.json(), { error: "missing_token" });
   assertEquals(seen.sarvamCalls, 0);
@@ -18,7 +31,7 @@ Deno.test("missing JWT is rejected and does not call Sarvam", async () => {
 Deno.test("invalid JWT is rejected and does not call Sarvam", async () => {
   const seen = tracker({ parentId: null });
   const response = await handleSarvamProxy(
-    request("not-a-jwt", { child_profile_id: CHILD, audio_base64: AUDIO_BASE64 }),
+    request("not-a-jwt", contractBody()),
     seen.deps,
   );
   assertEquals(response.status, 401);
@@ -30,11 +43,7 @@ Deno.test("invalid JWT is rejected and does not call Sarvam", async () => {
 Deno.test("consent denied returns 403 and does not call Sarvam", async () => {
   const seen = tracker({ parentId: "parent-1", consent: false });
   const response = await handleSarvamProxy(
-    request("parent-token", {
-      child_profile_id: CHILD,
-      audio_base64: AUDIO_BASE64,
-      nickname: "should-not-matter",
-    }),
+    request("parent-token", contractBody({ nickname: "should-not-matter" })),
     seen.deps,
   );
   assertEquals(response.status, 403);
@@ -59,16 +68,11 @@ Deno.test("consent granted returns the transcript and logs latency and cost only
     },
   });
   const response = await handleSarvamProxy(
-    request("parent-token", {
-      child_profile_id: CHILD,
-      audio_base64: AUDIO_BASE64,
-      content_type: "audio/wav",
-      locale: "hi-IN",
-    }),
+    request("parent-token", contractBody({ locale: "hi-IN" })),
     seen.deps,
   );
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { transcript: TRANSCRIPT, cost: 0.42, latency_ms: 250 });
+  assertEquals(await response.json(), { transcript: TRANSCRIPT, latencyMs: 250, cost: "0.42" });
   assertEquals(seen.sarvamCalls, 1);
   assertEquals(seen.logs, [{ latency_ms: 250, cost: 0.42 }]);
   const logged = JSON.stringify(seen.logs);
@@ -77,6 +81,38 @@ Deno.test("consent granted returns the transcript and logs latency and cost only
   assertEquals(logged.includes(TRANSCRIPT), false);
   assertEquals(logged.includes("parent-token"), false);
   assertEquals(Object.keys(seen.logs[0]).sort(), ["cost", "latency_ms"]);
+});
+
+Deno.test("the contract body is required before consent or Sarvam", async () => {
+  const seen = tracker({ parentId: "parent-1", consent: true });
+  const missingChild = await handleSarvamProxy(
+    request("parent-token", contractBody({ child_profile_id: "" })),
+    seen.deps,
+  );
+  assertEquals(missingChild.status, 400);
+  assertEquals(await missingChild.json(), { error: "child_required" });
+
+  const camelCase = await handleSarvamProxy(
+    request("parent-token", {
+      childProfileId: CHILD,
+      audioBase64: AUDIO_BASE64,
+      locale: "en-IN",
+      consentRecordId: CONSENT,
+      consentVersion: CONSENT_VERSION,
+    }),
+    seen.deps,
+  );
+  assertEquals(camelCase.status, 400);
+  assertEquals(await camelCase.json(), { error: "child_required" });
+
+  const missingConsent = await handleSarvamProxy(
+    request("parent-token", contractBody({ consent_record_id: undefined, consent_version: undefined })),
+    seen.deps,
+  );
+  assertEquals(missingConsent.status, 400);
+  assertEquals(await missingConsent.json(), { error: "consent_record_required" });
+  assertEquals(seen.sarvamCalls, 0);
+  assertEquals(seen.consentCalls, 0);
 });
 
 Deno.test("log line keeps latency and cost even if extra fields are passed", () => {

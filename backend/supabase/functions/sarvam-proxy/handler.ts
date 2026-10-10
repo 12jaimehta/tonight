@@ -10,6 +10,8 @@ export type ProxyDeps = {
   lookupConsent: (input: {
     parentId: string;
     childProfileId: string;
+    consentRecordId: string;
+    consentVersion: string;
     accessToken: string;
   }) => Promise<boolean>;
   callSarvam: (input: {
@@ -74,14 +76,28 @@ export async function handleSarvamProxy(req: Request, deps: ProxyDeps): Promise<
   if (!audioBase64) {
     return json({ error: "audio_required" }, 400);
   }
-  const contentType = textField(payload, "content_type") ?? "audio/wav";
-  const locale = textField(payload, "locale") ?? "unknown";
+  const locale = textField(payload, "locale");
+  if (!locale) {
+    return json({ error: "locale_required" }, 400);
+  }
+  const consentRecordId = textField(payload, "consent_record_id");
+  if (!consentRecordId || !CHILD_ID.test(consentRecordId)) {
+    return json({ error: "consent_record_required" }, 400);
+  }
+  const consentVersion = textField(payload, "consent_version");
+  if (!consentVersion) {
+    return json({ error: "consent_version_required" }, 400);
+  }
+  // The contract body does not carry a content type. Clips are WAV.
+  const contentType = "audio/wav";
 
   let allowed = false;
   try {
     allowed = await deps.lookupConsent({
       parentId: session.parentId,
       childProfileId,
+      consentRecordId,
+      consentVersion,
       accessToken: token,
     });
   } catch {
@@ -107,7 +123,12 @@ export async function handleSarvamProxy(req: Request, deps: ProxyDeps): Promise<
   const latencyMs = Math.max(0, now() - started);
   const cost = typeof result.cost === "number" && Number.isFinite(result.cost) ? result.cost : 0;
   deps.log({ latency_ms: latencyMs, cost });
-  return json({ transcript: result.transcript, cost, latency_ms: latencyMs }, 200);
+  return json({ transcript: result.transcript, latencyMs, cost: formatCost(cost) }, 200);
+}
+
+function formatCost(cost: number): string {
+  if (!Number.isFinite(cost) || cost === 0) return "0";
+  return cost.toFixed(6).replace(/\.?0+$/, "");
 }
 
 function textField(payload: Record<string, unknown>, key: string): string | null {

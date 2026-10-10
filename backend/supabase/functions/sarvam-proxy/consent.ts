@@ -7,13 +7,21 @@ export function createConsentLookup(deps: {
   supabaseUrl: string;
   anonKey: string;
   fetchImpl: FetchLike;
-}): (input: { parentId: string; childProfileId: string; accessToken: string }) => Promise<boolean> {
-  return async ({ parentId, childProfileId, accessToken }) => {
+}): (input: {
+  parentId: string;
+  childProfileId: string;
+  consentRecordId: string;
+  consentVersion: string;
+  accessToken: string;
+}) => Promise<boolean> {
+  return async ({ parentId, childProfileId, consentRecordId, consentVersion, accessToken }) => {
     if (!deps.supabaseUrl) throw new Error("consent_lookup_unconfigured");
     const url = new URL("/rest/v1/consent_record", deps.supabaseUrl);
-    url.searchParams.set("select", "version,scopes,withdrawn_at");
+    url.searchParams.set("select", "id,version,scopes,withdrawn_at");
+    url.searchParams.set("id", `eq.${consentRecordId}`);
     url.searchParams.set("parent_id", `eq.${parentId}`);
     url.searchParams.set("child_profile_id", `eq.${childProfileId}`);
+    url.searchParams.set("version", `eq.${consentVersion}`);
     url.searchParams.set("withdrawn_at", "is.null");
     url.searchParams.set("scopes", "cs.{server_speech}");
 
@@ -35,7 +43,7 @@ export function createConsentLookup(deps: {
       if (!row || typeof row !== "object") return false;
       const record = row as { version?: unknown; scopes?: unknown; withdrawn_at?: unknown };
       return typeof record.version === "string" &&
-        record.version.trim().length > 0 &&
+        record.version === consentVersion &&
         record.withdrawn_at == null &&
         Array.isArray(record.scopes) &&
         record.scopes.includes("server_speech");
