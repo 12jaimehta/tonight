@@ -1,4 +1,4 @@
-import { createStorageClient, handleStoragePurge, purgeDue } from "./handler.ts";
+import { createStorageClient, handleStoragePurge, purgeDue, purgeOlderThan } from "./handler.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -17,6 +17,7 @@ Deno.serve((req) => {
         storage,
         markDone: (id) => markDone(supabaseUrl, serviceKey, id),
       }),
+    purgeRetention: () => purgeOlderThan({ storage, days: 90, now: new Date() }),
   });
 });
 

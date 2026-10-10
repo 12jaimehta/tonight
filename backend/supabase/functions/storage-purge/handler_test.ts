@@ -1,4 +1,11 @@
-import { createStorageClient, handleStoragePurge, purgeDue, type DeletionQueueRow, type StorageObject } from "./handler.ts";
+import {
+  createStorageClient,
+  handleStoragePurge,
+  purgeDue,
+  purgeOlderThan,
+  type DeletionQueueRow,
+  type StorageObject,
+} from "./handler.ts";
 
 Deno.test("DEL-06 DEL-16 storage remove then an empty list marks the row done", async () => {
   const removed: string[][] = [];
@@ -91,6 +98,58 @@ Deno.test("DEL-11 a scheduled POST runs the due purge", async () => {
     { purgeDue: async () => ({ deletedIds: [], remaining: [] }) },
   );
   assertEquals(missing.status, 401);
+});
+
+Deno.test("DEL-16 retention deletes object bytes older than 90 days", async () => {
+  const now = new Date("2026-10-10T00:00:00.000Z");
+  const old = "2026-07-01T00:00:00.000Z";
+  const recent = "2026-10-09T00:00:00.000Z";
+  const removed: string[][] = [];
+  const result = await purgeOlderThan({
+    days: 90,
+    now,
+    storage: {
+      list: async () => [
+        { name: "old.wav", createdAt: old },
+        { name: "nested/deep.wav", createdAt: old },
+        { name: "recent.wav", createdAt: recent },
+        { name: "undated.wav" },
+      ],
+      remove: async (names) => {
+        removed.push(names);
+      },
+    },
+  });
+  assertEquals(removed, [["old.wav", "nested/deep.wav"]]);
+  assertEquals(result.removed, ["old.wav", "nested/deep.wav"]);
+});
+
+Deno.test("DEL-16 list pages past the cap and recurses into folders", async () => {
+  const client = createStorageClient({
+    supabaseUrl: "https://project-ref.supabase.co",
+    serviceKey: "service-role",
+    bucket: "study-audio",
+    pageSize: 2,
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as { prefix: string; offset: number; limit: number };
+      if (body.prefix === "parent/" && body.offset === 0) {
+        return json([
+          { name: "a.wav", id: "a", created_at: "2026-01-01T00:00:00.000Z" },
+          { name: "folder", id: null },
+        ]);
+      }
+      if (body.prefix === "parent/" && body.offset === 2) {
+        return json([{ name: "b.wav", id: "b" }]);
+      }
+      if (body.prefix === "parent/folder/") {
+        return json([{ name: "c.wav", id: "c" }]);
+      }
+      return json([]);
+    },
+  });
+  const objects = await client.list("parent/");
+  assertEquals(objects.map((object) => object.name), ["parent/a.wav", "parent/folder/c.wav", "parent/b.wav"]);
+  assertEquals(objects[0].createdAt, "2026-01-01T00:00:00.000Z");
 });
 
 Deno.test("DEL-21 the migration alerts on unfinished rows", async () => {

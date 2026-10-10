@@ -41,6 +41,11 @@ def main() -> None:
         raise SystemExit("DEL-21 stuck or failed deletions do not raise an alert")
     if "> interval '24 hours'" not in alerts:
         raise SystemExit("DEL-21 alert is missing the 24 hour comparison")
+    retention = latest_function(combined, "purge_study_audio_older_than_90_days")
+    if "delete from storage.objects" in retention.lower():
+        raise SystemExit("DEL-16 90-day purge still deletes rows instead of object bytes")
+    if "invoke_storage_purge('retention')" not in retention and 'invoke_storage_purge("retention")' not in retention:
+        raise SystemExit("DEL-16 90-day purge does not call storage-purge retention")
     entry = pathlib.Path(__file__).resolve().parents[1] / "supabase" / "functions" / "storage-purge" / "index.ts"
     entry_text = entry.read_text(encoding="utf-8")
     if "Deno.serve" not in entry_text or "handleStoragePurge" not in entry_text:
