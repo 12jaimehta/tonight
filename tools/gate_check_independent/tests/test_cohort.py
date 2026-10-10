@@ -78,20 +78,42 @@ def test_null_class_is_out_of_cohort() -> None:
     assert "missing a class" in caught.value.message
 
 
-def test_age_class_mismatch_warns_and_still_decides() -> None:
+@pytest.mark.parametrize(
+    ("age", "school_class", "warns"),
+    [
+        (6, 1, False),
+        (7, 1, False),
+        (8, 1, True),
+        (6, 2, False),
+        (7, 2, False),
+        (8, 2, False),
+        (6, 3, True),
+        (7, 3, False),
+        (8, 3, False),
+    ],
+)
+def test_rule_7_age_class_pairs(age: int, school_class: int, warns: bool) -> None:
+    """Expected age is class + 5, and ±1 year does not warn. Mismatches are not rejected."""
+
     payload = study(
         [
             child(
                 "c",
-                6,
-                [recording("r", [agreed(True, True, 10), agreed(False, False, 2)])],
-                school_class=3,
+                age,
+                [recording("r", [agreed(True, True, 10), agreed(False, False, 1)])],
+                school_class=school_class,
             )
         ]
     )
     result = evaluate(payload, **FAST)
     assert result.decision == "APPLE"
-    assert result.warnings == ("child c age 6 is paired with class 3; expected class 1",)
+    if warns:
+        expected_age = school_class + 5
+        assert result.warnings == (
+            f"child c age {age} is paired with class {school_class}; expected age is {expected_age} ± 1",
+        )
+    else:
+        assert result.warnings == ()
 
 
 def test_matching_age_and_class_has_no_warning() -> None:
@@ -125,6 +147,103 @@ def test_out_of_range_class_on_a_file_is_rejected() -> None:
     with pytest.raises(GateCheckError) as caught:
         evaluate(shifted, **FAST)
     assert caught.value.code == "OUT_OF_COHORT"
+
+
+def test_recording_with_no_sarvam_result_is_unpaired() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                7,
+                [
+                    recording(
+                        "lonely",
+                        [{"reference_correct": True, "apple_correct": True, "sarvam_correct": None, "n": 10}],
+                    )
+                ],
+            )
+        ]
+    )
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "UNPAIRED_RECORDING"
+    assert "lonely" in caught.value.message
+    assert "no matching pair" in caught.value.message
+
+
+def test_recording_missing_an_engine_key_is_unpaired() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                7,
+                [recording("half", [{"reference_correct": False, "apple_correct": False, "n": 4}])],
+            )
+        ]
+    )
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "UNPAIRED_RECORDING"
+    assert "half" in caught.value.message
+
+
+def test_one_unpaired_recording_rejects_the_study() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                7,
+                [
+                    recording("ok", [agreed(True, True, 10), agreed(False, False, 1)]),
+                    recording("missing-apple", [{"reference_correct": True, "sarvam_correct": True, "n": 3}]),
+                ],
+            )
+        ]
+    )
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "UNPAIRED_RECORDING"
+    assert "missing-apple" in caught.value.message
+
+
+def test_a_word_with_no_engine_pair_is_left_out_of_the_counts() -> None:
+    paired = study(
+        [child("c", 7, [recording("r", [agreed(True, True, 10), agreed(False, False, 1)])])]
+    )
+    with_gap = study(
+        [
+            child(
+                "c",
+                7,
+                [
+                    recording(
+                        "r",
+                        [
+                            agreed(True, True, 10),
+                            agreed(False, False, 1),
+                            {"reference_correct": True, "apple_correct": False, "sarvam_correct": None, "n": 50},
+                        ],
+                    )
+                ],
+            )
+        ]
+    )
+    assert evaluate(with_gap, **FAST) == evaluate(paired, **FAST)
+
+
+def test_engine_call_that_is_not_a_boolean_or_null_is_invalid_input() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                7,
+                [recording("r", [{"reference_correct": True, "apple_correct": True, "sarvam_correct": "yes", "n": 1}])],
+            )
+        ]
+    )
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "INVALID_INPUT"
 
 
 def test_non_integer_class_is_invalid_input() -> None:

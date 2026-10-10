@@ -39,6 +39,88 @@ def test_exactly_090_is_invalid_because_false_accept_denominator_is_zero(
     assert "false-accept" in captured.err
 
 
+def test_unpaired_recording_exits_with_its_code(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "unpaired.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "children": [
+                    {
+                        "child_id": "c",
+                        "age": 7,
+                        "school_class": 2,
+                        "recordings": [
+                            {
+                                "recording_id": "solo",
+                                "cells": [
+                                    {
+                                        "reference_correct": True,
+                                        "apple_correct": True,
+                                        "sarvam_correct": None,
+                                        "n": 8,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main([str(path), "--format", "json"]) == 2
+    body = json.loads(capsys.readouterr().out)
+    assert body["error"] == "UNPAIRED_RECORDING"
+    assert "solo" in body["message"]
+
+
+def test_age_class_warning_is_logged_and_the_study_still_decides(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    path = tmp_path / "class1-age8.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "children": [
+                    {
+                        "child_id": "c",
+                        "age": 8,
+                        "school_class": 1,
+                        "recordings": [
+                            {
+                                "recording_id": "r",
+                                "cells": [
+                                    {
+                                        "reference_correct": True,
+                                        "apple_correct": True,
+                                        "sarvam_correct": True,
+                                        "n": 10,
+                                    },
+                                    {
+                                        "reference_correct": False,
+                                        "apple_correct": False,
+                                        "sarvam_correct": False,
+                                        "n": 1,
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main([str(path)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == "APPLE\n"
+    assert "seed=" in captured.err
+    assert "warning: child c age 8 is paired with class 1; expected age is 6 ± 1" in captured.err
+
+
 def test_missing_age_example_exits_out_of_cohort(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([str(EXAMPLES / "missing_age.json")]) == 2
     captured = capsys.readouterr()

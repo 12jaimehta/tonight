@@ -22,10 +22,6 @@ SARVAM_AGREEMENT_MARGIN = Fraction(1, 20)
 
 VALID_AGES = frozenset({6, 7, 8})
 VALID_CLASSES = frozenset({1, 2, 3})
-# Year-by-year pairing of the locked 6–8 band with classes 1–3. Any other
-# in-range pair is a warning, not a rejection. The computation rules require
-# that warning and do not publish a different table.
-EXPECTED_CLASS_FOR_AGE = {6: 1, 7: 2, 8: 3}
 SCHEMA_VERSION = 1
 
 # Ruled interval: 95% percentile, 10,000 draws, fixed seed logged with the result.

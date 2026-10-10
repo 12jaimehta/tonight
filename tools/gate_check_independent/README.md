@@ -11,7 +11,7 @@ python -m pytest
 python -m gate_check_independent examples/exactly_5pp.json
 ```
 
-Text mode prints one decision token on stdout. Stderr logs `seed=<n>` and any age/class warnings. `NO_GO` exits 0. `OUT_OF_COHORT`, `INVALID_STUDY`, and `INVALID_INPUT` exit 2. `--format json` prints rates as numerator/denominator pairs and logs the seed in the report.
+Text mode prints one decision token on stdout. Stderr logs `seed=<n>` and any age/class warnings. `NO_GO` exits 0. `OUT_OF_COHORT`, `INVALID_STUDY`, `UNPAIRED_RECORDING`, and `INVALID_INPUT` exit 2. `--format json` prints rates as numerator/denominator pairs and logs the seed in the report.
 
 ```bash
 python -m gate_check_independent examples/exactly_5pp.json --format json
@@ -21,13 +21,13 @@ python -m gate_check_independent examples/exactly_5pp.json --format json
 
 Age and class are screened first. A missing age, a null age, or an integer age outside {6, 7, 8} is `OUT_OF_COHORT`. A missing class, a null class, or an integer class outside {1, 2, 3} is the same error. The child is not dropped and is not scored.
 
-An in-range age and class that are not the year-by-year pair below is a warning. The study is still scored. The computation rules require that warning and do not publish another pairing; this is the one-year step across classes 1–3.
+Rule 7: the expected age is class + 5, and ±1 year is fine. A mismatch is a warning, and the study is still scored. It is never a rejection. Inside ages 6–8 and classes 1–3 the only warnings are class 1 with age 8, and class 3 with age 6.
 
-| Age | Class |
+| Class | Ages that do not warn |
 |---|---|
-| 6 | 1 |
-| 7 | 2 |
-| 8 | 3 |
+| 1 | 6, 7 |
+| 2 | 6, 7, 8 |
+| 3 | 7, 8 |
 
 Each engine is then scored on the pooled judged words:
 
@@ -70,6 +70,8 @@ The cluster is the child. Every recording of a drawn child stays together. The s
 `schema_version` must be `1`. `children` is a non-empty list. Each child has a non-empty string `child_id`, an integer `age`, an integer `school_class`, and a non-empty `recordings` list. Each recording has a unique `recording_id` and exactly one of `cells` or `words`.
 
 A cell is one pattern of the booleans plus a non-negative integer `n`. `reference_correct` may be `null` for an unjudged word. Duplicate judged patterns in one recording are added together. A word object is one judged or unjudged token. Both engines are judged on the same tokens.
+
+`apple_correct` or `sarvam_correct` may be missing or `null` when that engine has no result for the word. That word is not a pair and is left out of the counts. A recording that then has no word judged by both engines is `UNPAIRED_RECORDING`. The study is not scored.
 
 ```json
 {

@@ -3,8 +3,14 @@
 Age and class are screened here, before any engine is scored. A missing age
 or class, an integer age outside 6–8, and an integer class outside 1–3 are
 ``OUT_OF_COHORT``. A decision is never returned for a cohort that still
-contains such a child. An in-range age/class pair other than 6→1, 7→2, 8→3
-is a warning on the cohort.
+contains such a child.
+
+Rule 7: the expected age is class + 5, and one year either side is fine.
+Inside the cohort that warns only for class 1 with age 8, and class 3 with
+age 6. A mismatch is a warning, never a rejection.
+
+A recording whose words are not judged by both engines has no matching pair
+and is ``UNPAIRED_RECORDING``.
 """
 
 from __future__ import annotations
@@ -14,7 +20,6 @@ from typing import Any
 
 from gate_check_independent.errors import GateCheckError
 from gate_check_independent.types import (
-    EXPECTED_CLASS_FOR_AGE,
     SCHEMA_VERSION,
     VALID_AGES,
     VALID_CLASSES,
@@ -65,12 +70,9 @@ def parse_cohort(payload: object) -> Cohort:
                 recordings=child.recordings,
             )
         )
-        expected = EXPECTED_CLASS_FOR_AGE[child.age]
-        if child.school_class != expected:
-            warnings.append(
-                f"child {child.child_id} age {child.age} is paired with class "
-                f"{child.school_class}; expected class {expected}"
-            )
+        warning = _age_class_warning(child.child_id, child.age, child.school_class)
+        if warning is not None:
+            warnings.append(warning)
     return Cohort(children=tuple(confirmed), warnings=tuple(warnings))
 
 
@@ -180,56 +182,93 @@ def _parse_recording(
             f"{path} must contain exactly one of 'cells' or 'words'",
         )
     if has_cells:
-        counts = _counts_from_cells(body.get("cells"), f"{path}.cells")
+        counts, saw_pair = _counts_from_cells(body.get("cells"), f"{path}.cells")
     else:
-        counts = _counts_from_words(body.get("words"), f"{path}.words")
+        counts, saw_pair = _counts_from_words(body.get("words"), f"{path}.words")
+    if not saw_pair:
+        raise GateCheckError(
+            "UNPAIRED_RECORDING",
+            f"recording {recording_id} has no matching pair",
+        )
     return _totals(recording_id, child_id, counts, path)
 
 
-def _counts_from_cells(raw: object, path: str) -> dict[tuple[bool, bool, bool], int]:
+def _age_class_warning(child_id: str, age: int, school_class: int) -> str | None:
+    """Rule 7. Expected age is class + 5, and ±1 year does not warn.
+
+    On the ages 6–8 and classes 1–3 grid this warns only for class 1 with
+    age 8, and class 3 with age 6.
+    """
+
+    expected_age = school_class + 5
+    if abs(age - expected_age) <= 1:
+        return None
+    return (
+        f"child {child_id} age {age} is paired with class {school_class}; "
+        f"expected age is {expected_age} ± 1"
+    )
+
+
+def _counts_from_cells(raw: object, path: str) -> tuple[dict[tuple[bool, bool, bool], int], bool]:
     if not isinstance(raw, list) or not raw:
         raise GateCheckError("INVALID_INPUT", f"{path} must be a non-empty list")
     counts: dict[tuple[bool, bool, bool], int] = {}
+    saw_pair = False
     for index, item in enumerate(raw):
         cell = _object(item, f"{path}[{index}]")
-        key = _judged_pattern(cell, f"{path}[{index}]")
+        key, paired = _judged_pattern(cell, f"{path}[{index}]")
         count = _count(cell.get("n"), f"{path}[{index}].n")
+        if not paired:
+            continue
+        saw_pair = True
         if key is None:
             continue
         counts[key] = counts.get(key, 0) + count
-    return counts
+    return counts, saw_pair
 
 
-def _counts_from_words(raw: object, path: str) -> dict[tuple[bool, bool, bool], int]:
+def _counts_from_words(raw: object, path: str) -> tuple[dict[tuple[bool, bool, bool], int], bool]:
     if not isinstance(raw, list) or not raw:
         raise GateCheckError("INVALID_INPUT", f"{path} must be a non-empty list")
     counts: dict[tuple[bool, bool, bool], int] = {}
+    saw_pair = False
     for index, item in enumerate(raw):
         word = _object(item, f"{path}[{index}]")
-        key = _judged_pattern(word, f"{path}[{index}]")
+        key, paired = _judged_pattern(word, f"{path}[{index}]")
+        if not paired:
+            continue
+        saw_pair = True
         if key is None:
             continue
         counts[key] = counts.get(key, 0) + 1
-    return counts
+    return counts, saw_pair
 
 
-def _judged_pattern(body: Mapping[str, Any], path: str) -> tuple[bool, bool, bool] | None:
-    """Return the judged pattern, or None when the adult left the word unjudged.
+def _judged_pattern(
+    body: Mapping[str, Any],
+    path: str,
+) -> tuple[tuple[bool, bool, bool] | None, bool]:
+    """Return ``(pattern, paired)``.
 
-    A missing ``reference_correct`` is a schema error. JSON null is unjudged
-    and is excluded from agreement, false-accept, and false-reject.
+    ``paired`` is false when either engine call is missing or JSON null: that
+    word is not a matching pair and is left out of the counts. A missing
+    ``reference_correct`` is a schema error. JSON null for the reference, with
+    both engines present, is unjudged: ``paired`` is true and the pattern is
+    None, so the word is excluded from agreement, false-accept, and false-reject.
     """
 
     if "reference_correct" not in body:
         raise GateCheckError("INVALID_INPUT", f"{path}.reference_correct is required")
     reference = body.get("reference_correct")
-    apple = _boolean(body.get("apple_correct"), f"{path}.apple_correct")
-    sarvam = _boolean(body.get("sarvam_correct"), f"{path}.sarvam_correct")
-    if reference is None:
-        return None
-    if not isinstance(reference, bool):
+    if reference is not None and not isinstance(reference, bool):
         raise GateCheckError("INVALID_INPUT", f"{path}.reference_correct must be a boolean or null")
-    return (reference, apple, sarvam)
+    apple = _optional_boolean(body, "apple_correct", path)
+    sarvam = _optional_boolean(body, "sarvam_correct", path)
+    if apple is None or sarvam is None:
+        return None, False
+    if reference is None:
+        return None, True
+    return (reference, apple, sarvam), True
 
 
 def _totals(
@@ -290,10 +329,15 @@ def _identifier(raw: object, path: str) -> str:
     return raw
 
 
-def _boolean(raw: object, path: str) -> bool:
-    if not isinstance(raw, bool):
-        raise GateCheckError("INVALID_INPUT", f"{path} must be a boolean")
-    return raw
+def _optional_boolean(body: Mapping[str, Any], key: str, path: str) -> bool | None:
+    """An engine call. Missing or JSON null means this engine did not score the word."""
+
+    if key not in body or body.get(key) is None:
+        return None
+    value = body.get(key)
+    if not isinstance(value, bool):
+        raise GateCheckError("INVALID_INPUT", f"{path}.{key} must be a boolean, or null if this engine has no result")
+    return value
 
 
 def _count(raw: object, path: str) -> int:
