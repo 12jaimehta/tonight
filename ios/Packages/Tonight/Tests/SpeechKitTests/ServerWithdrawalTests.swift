@@ -50,13 +50,15 @@ final class ServerWithdrawalTests: XCTestCase {
         let client = makeClient(transport: transport, token: "parent-access-token", queueFile: file)
         await client.submit(childID: child, consentRecordID: consent)
         XCTAssertEqual(client.pending().count, 1)
-        XCTAssertEqual(await transport.calls.count, 0)
+        let offlineCalls = await transport.calls
+        XCTAssertEqual(offlineCalls.count, 0)
 
         let relaunched = makeClient(transport: transport, token: "parent-access-token", queueFile: file)
         XCTAssertEqual(relaunched.pending().count, 1)
         await transport.setOffline(false)
         await relaunched.flush()
-        XCTAssertEqual(await transport.calls.map(\.method), ["PATCH", "DELETE"])
+        let flushed = await transport.calls
+        XCTAssertEqual(flushed.map(\.method), ["PATCH", "DELETE"])
         XCTAssertTrue(relaunched.pending().isEmpty)
     }
 
@@ -68,13 +70,14 @@ final class ServerWithdrawalTests: XCTestCase {
         let file = queueFile ?? FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathComponent("queue.json")
+        let when = self.when
         return ServerWithdrawalClient(
             baseURL: URL(string: "https://project-ref.supabase.co")!,
             anonKey: "anon-test",
             accessToken: { token },
             send: { request in try await transport.send(request) },
             queueFile: file,
-            now: { self.when }
+            now: { when }
         )
     }
 }
