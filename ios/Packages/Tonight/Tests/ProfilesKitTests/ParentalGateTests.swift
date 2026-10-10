@@ -45,7 +45,40 @@ final class ParentalGateTests: XCTestCase {
         XCTAssertEqual(later, .unlocked)
     }
 
-    func test_PRIV25c_eachDrawCanChangeTheChallenge() {
+    func test_PRIV26_lockoutSurvivesRelaunch() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "gate-\(UUID().uuidString)"))
+        var session = ParentalGateSession()
+        let now = Date(timeIntervalSince1970: 10_000)
+        let challenge = ParentalGateBank.challenges[0]
+        XCTAssertEqual(session.submit(answer: "0", to: challenge, now: now), .incorrect(remaining: 2))
+        XCTAssertEqual(session.submit(answer: "0", to: challenge, now: now), .incorrect(remaining: 1))
+        XCTAssertEqual(session.submit(answer: "0", to: challenge, now: now), .locked)
+        session.resetForBackground()
+        session.lockoutRecord.save(to: defaults)
+        var relaunched = ParentalGateSession(lockoutRecord: ParentalGateLockout.load(from: defaults))
+        XCTAssertEqual(relaunched.failures, 3)
+        XCTAssertTrue(relaunched.isLocked(at: now))
+        XCTAssertEqual(relaunched.submit(answer: "1692", to: challenge, now: now.addingTimeInterval(30)), .locked)
+        XCTAssertEqual(relaunched.submit(answer: "1692", to: challenge, now: now.addingTimeInterval(60)), .unlocked)
+        let stored = try XCTUnwrap(defaults.data(forKey: ParentalGateLockout.storageKey))
+        let text = try XCTUnwrap(String(data: stored, encoding: .utf8)).lowercased()
+        XCTAssertFalse(text.contains("1692"))
+        XCTAssertFalse(text.contains("pin"))
+        XCTAssertFalse(text.contains("×"))
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("TonightApp/RootView.swift")
+        let source = try String(contentsOf: root, encoding: .utf8)
+        XCTAssertTrue(source.contains("ParentalGateLockout.load"))
+        XCTAssertTrue(source.contains("lockoutRecord.save"))
+        XCTAssertTrue(source.contains("randomChallenge"))
+    }
+
+    func test_PRIV25c_eachPresentationDrawsANewChallenge() {
         struct Scripted: RandomNumberGenerator {
             var nextValue: UInt64
             mutating func next() -> UInt64 { nextValue }

@@ -7,7 +7,7 @@ import SwiftUI
 struct RootView: View {
     var consentCenter: ConsentCenter
     @Environment(\.scenePhase) private var scenePhase
-    @State private var gate = ParentalGateSession()
+    @State private var gate = ParentalGateSession(lockoutRecord: ParentalGateLockout.load(from: .standard))
     @State private var showingParent = false
     @State private var unlocked = false
     @State private var answer = ""
@@ -99,6 +99,7 @@ struct RootView: View {
         case .locked:
             notice = "Locked for a minute."
         }
+        gate.lockoutRecord.save(to: .standard)
     }
 
     private func closeParent() {

@@ -43,7 +43,7 @@ public enum ParentalGateBank {
     }
 }
 
-/// Three wrong answers lock the gate for 60 seconds. The lockout stays in memory across backgrounding. This is not a PIN.
+/// Three wrong answers lock the gate for 60 seconds. The lockout survives backgrounding and relaunch. This is not a PIN.
 public struct ParentalGateSession: Equatable, Sendable {
     public static let failureLimit = 3
     public static let lockout: TimeInterval = 60
@@ -76,6 +76,42 @@ public struct ParentalGateSession: Equatable, Sendable {
 
     /// Backgrounding may clear the unlocked screen. It does not reset failures or the lockout.
     public mutating func resetForBackground() {}
+
+    public var lockoutRecord: ParentalGateLockout {
+        ParentalGateLockout(failures: failures, lockedUntil: lockedUntil)
+    }
+
+    public init(lockoutRecord: ParentalGateLockout) {
+        failures = lockoutRecord.failures
+        lockedUntil = lockoutRecord.lockedUntil
+    }
+}
+
+/// Failures and the lockout deadline. This is not a PIN and it is not the challenge answer.
+public struct ParentalGateLockout: Codable, Equatable, Sendable {
+    public var failures: Int
+    public var lockedUntil: Date?
+
+    public init(failures: Int = 0, lockedUntil: Date? = nil) {
+        self.failures = failures
+        self.lockedUntil = lockedUntil
+    }
+
+    public static func load(from defaults: UserDefaults, key: String = ParentalGateLockout.storageKey) -> ParentalGateLockout {
+        guard let data = defaults.data(forKey: key) else { return ParentalGateLockout() }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (try? decoder.decode(ParentalGateLockout.self, from: data)) ?? ParentalGateLockout()
+    }
+
+    public func save(to defaults: UserDefaults, key: String = ParentalGateLockout.storageKey) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(self) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    public static let storageKey = "parental-gate-lockout"
 }
 
 /// A link or purchase leaves the app only after the gate is unlocked. A locked gate has no destination.
