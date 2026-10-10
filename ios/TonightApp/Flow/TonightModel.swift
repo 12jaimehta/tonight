@@ -489,10 +489,17 @@ final class TonightModel {
 
     private func seedLocalChildData() {
         guard let child, let consentCenter else { return }
-        try? consentCenter.ledger.addRememberWord("kite", childProfileID: child.id)
-        try? consentCenter.ledger.addMarkCorrection("star", childProfileID: child.id)
-        if (try? consentCenter.ledger.storeAudio(Data([1, 2, 3]), childProfileID: child.id, serverPath: false)) == nil {
-            _ = try? consentCenter.ledger.storeText("clip", childProfileID: child.id, kind: .audio, serverPath: false)
+        let ledger = consentCenter.ledger
+        if ledger.rememberWords(childProfileID: child.id).isEmpty {
+            try? ledger.addRememberWord("kite", childProfileID: child.id)
+        }
+        if ledger.markCorrections(childProfileID: child.id).isEmpty {
+            try? ledger.addMarkCorrection("star", childProfileID: child.id)
+        }
+        if ledger.liveArtefacts(childProfileID: child.id).isEmpty {
+            if (try? ledger.storeAudio(Data([1, 2, 3]), childProfileID: child.id, serverPath: false)) == nil {
+                _ = try? ledger.storeText("clip", childProfileID: child.id, kind: .audio, serverPath: false)
+            }
         }
     }
 
