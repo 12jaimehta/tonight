@@ -71,7 +71,7 @@ public enum ReadingNormalizer {
     }
 
     /// Adjacent number words such as "twenty five" are one value. A hyphen is not required.
-    static func mergeNumberWords(_ pieces: [Piece]) -> [String] {
+    private static func mergeNumberWords(_ pieces: [Piece]) -> [String] {
         var output: [String] = []
         var index = 0
         while index < pieces.count {
