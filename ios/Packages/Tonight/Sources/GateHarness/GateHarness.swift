@@ -687,7 +687,11 @@ private func strictBoolean(_ raw: Any?) -> Bool? {
 }
 
 private func isJSONBool(_ number: NSNumber) -> Bool {
-    CFGetTypeID(number) == CFBooleanGetTypeID()
+    #if canImport(Darwin)
+    return CFGetTypeID(number) == CFBooleanGetTypeID()
+    #else
+    return String(cString: number.objCType) == "c"
+    #endif
 }
 
 /// Python `random.Random`: MT19937 seeded like CPython, `randrange` via `getrandbits`.
