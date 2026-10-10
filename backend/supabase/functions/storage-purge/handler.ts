@@ -1,5 +1,6 @@
-// Deletes study-audio object bytes through the Storage API. A queue row is
-// finished only after a follow-up list for that prefix is empty.
+// Deletes object bytes through the Storage API. A queue row is finished only
+// after a follow-up list for that prefix is empty. The removed study-audio
+// bucket and rows with no bucket are marked done without a list call.
 
 export type StorageObject = { name: string; createdAt?: string };
 
@@ -18,6 +19,8 @@ export type PurgeDeps = {
   due: () => Promise<DeletionQueueRow[]>;
   storage: StorageClient;
   markDone: (id: string) => Promise<void>;
+  /** Buckets that are not in Storage. Those rows are marked done and do not call list. */
+  absentBuckets?: string[];
 };
 
 export type PurgeResult = {
@@ -79,18 +82,28 @@ export async function purgeOlderThan(deps: {
 export async function purgeDue(deps: PurgeDeps): Promise<PurgeResult> {
   const deletedIds: string[] = [];
   const remaining: string[] = [];
+  const absent = new Set(deps.absentBuckets ?? ["none", "study-audio"]);
   for (const row of await deps.due()) {
-    const names = (await deps.storage.list(row.objectPrefix)).map((object) => object.name);
-    if (names.length > 0) {
-      await deps.storage.remove(names);
+    try {
+      if (absent.has(row.bucketId)) {
+        await deps.markDone(row.id);
+        deletedIds.push(row.id);
+        continue;
+      }
+      const names = (await deps.storage.list(row.objectPrefix)).map((object) => object.name);
+      if (names.length > 0) {
+        await deps.storage.remove(names);
+      }
+      const after = await deps.storage.list(row.objectPrefix);
+      if (after.length > 0) {
+        remaining.push(...after.map((object) => object.name));
+        continue;
+      }
+      await deps.markDone(row.id);
+      deletedIds.push(row.id);
+    } catch {
+      remaining.push(row.objectPrefix);
     }
-    const after = await deps.storage.list(row.objectPrefix);
-    if (after.length > 0) {
-      remaining.push(...after.map((object) => object.name));
-      continue;
-    }
-    await deps.markDone(row.id);
-    deletedIds.push(row.id);
   }
   return { deletedIds, remaining };
 }

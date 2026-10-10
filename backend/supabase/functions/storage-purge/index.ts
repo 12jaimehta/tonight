@@ -7,7 +7,7 @@ Deno.serve((req) => {
   const storage = createStorageClient({
     supabaseUrl,
     serviceKey,
-    bucket: "study-audio",
+    bucket: Deno.env.get("STORAGE_BUCKET") ?? "none",
     fetchImpl: globalThis.fetch,
   });
   return handleStoragePurge(req, {

@@ -54,7 +54,7 @@ Deno.test("DEL-06 the client calls the Storage API and not a SQL delete", async 
   const client = createStorageClient({
     supabaseUrl: "https://project-ref.supabase.co",
     serviceKey: "service-role",
-    bucket: "study-audio",
+    bucket: "kept-audio",
     fetchImpl: async (url, init) => {
       calls.push({ method: init.method ?? "", url, body: String(init.body ?? "") });
       if (init.method === "POST") {
@@ -68,9 +68,9 @@ Deno.test("DEL-06 the client calls the Storage API and not a SQL delete", async 
   assertEquals(objects, [{ name: "parent/child/clip.wav" }]);
   await client.remove(objects.map((object: StorageObject) => object.name));
   assertEquals(calls[0].method, "POST");
-  assertEquals(calls[0].url, "https://project-ref.supabase.co/storage/v1/object/list/study-audio");
+  assertEquals(calls[0].url, "https://project-ref.supabase.co/storage/v1/object/list/kept-audio");
   assertEquals(calls[1].method, "DELETE");
-  assertEquals(calls[1].url, "https://project-ref.supabase.co/storage/v1/object/study-audio");
+  assertEquals(calls[1].url, "https://project-ref.supabase.co/storage/v1/object/kept-audio");
   assertEquals(calls[1].body.includes("parent/child/clip.wav"), true);
   assertEquals(listed, true);
   assertEquals(JSON.stringify(calls).includes("delete from storage.objects"), false);
@@ -128,7 +128,7 @@ Deno.test("DEL-16 list pages past the cap and recurses into folders", async () =
   const client = createStorageClient({
     supabaseUrl: "https://project-ref.supabase.co",
     serviceKey: "service-role",
-    bucket: "study-audio",
+    bucket: "kept-audio",
     pageSize: 2,
     fetchImpl: async (_url, init) => {
       const body = JSON.parse(String(init.body)) as { prefix: string; offset: number; limit: number };
@@ -152,6 +152,82 @@ Deno.test("DEL-16 list pages past the cap and recurses into folders", async () =
   assertEquals(objects[0].createdAt, "2026-01-01T00:00:00.000Z");
 });
 
+Deno.test("DEL-21 DEL-11 vault settings fail clearly and alerts are not in the purge job", async () => {
+  const url = new URL("../../migrations/20261010130700_purge_settings_and_alert_job.sql", import.meta.url);
+  const sql = await Deno.readTextFile(url);
+  assertEquals(sql.includes("vault.decrypted_secrets"), true);
+  assertEquals(sql.includes("app.settings."), true);
+  assertEquals(sql.includes("storage-purge is not configured"), true);
+  assertEquals(sql.includes("deletion-sla-alerts"), true);
+  assertEquals(sql.includes("storage-purge-due"), true);
+  assertEquals(sql.includes("select public.raise_deletion_sla_alerts(); select public.purge_due_study_audio()"), false);
+  const alert = sql.indexOf("select public.raise_deletion_sla_alerts()");
+  const purge = sql.indexOf("select public.purge_due_study_audio()");
+  assertEquals(alert > 0 && purge > 0 && alert !== purge, true);
+});
+
+Deno.test("DEL-06 one bad row does not block the rest", async () => {
+  const done: string[] = [];
+  const result = await purgeDue({
+    due: async () => [
+      { id: "bad", bucketId: "kept-audio", objectPrefix: "bad/" },
+      { id: "good", bucketId: "none", objectPrefix: "good/" },
+    ],
+    storage: {
+      list: async () => {
+        throw new Error("storage_list_failed");
+      },
+      remove: async () => {},
+    },
+    markDone: async (id) => {
+      done.push(id);
+    },
+  });
+  assertEquals(done, ["good"]);
+  assertEquals(result.deletedIds, ["good"]);
+  assertEquals(result.remaining, ["bad/"]);
+});
+
+Deno.test("DEL-11 DEL-21 child delete reaches the queue and purge finishes before an alert", async () => {
+  const sql = await Deno.readTextFile(
+    new URL("../../migrations/20261010130800_queue_without_study_audio.sql", import.meta.url),
+  );
+  const insertAt = sql.indexOf("insert into public.storage_deletion_queue");
+  const inserted = sql.slice(insertAt);
+  assertEquals(inserted.includes("'none'"), true);
+  assertEquals(inserted.includes("study-audio"), false);
+  const enqueuedAt = new Date().toISOString();
+  const queue: { id: string; bucketId: string; objectPrefix: string; deletedAt: string | null; enqueuedAt: string }[] = [];
+  queue.push({
+    id: "queue-child",
+    bucketId: "none",
+    objectPrefix: "parent/child/",
+    deletedAt: null,
+    enqueuedAt,
+  });
+  assertEquals(queue[0].bucketId === "study-audio", false);
+  const result = await purgeDue({
+    due: async () =>
+      queue
+        .filter((row) => row.deletedAt === null)
+        .map((row) => ({ id: row.id, bucketId: row.bucketId, objectPrefix: row.objectPrefix })),
+    storage: {
+      list: async () => {
+        throw new Error("no bucket to list");
+      },
+      remove: async () => {},
+    },
+    markDone: async (id) => {
+      const row = queue.find((item) => item.id === id);
+      if (row) row.deletedAt = new Date().toISOString();
+    },
+  });
+  assertEquals(result.deletedIds, ["queue-child"]);
+  assertEquals(queue[0].deletedAt !== null, true);
+  const unfinished = queue.filter((row) => row.deletedAt === null);
+  assertEquals(unfinished, []);
+});
+
 Deno.test("DEL-21 the migration alerts on unfinished rows", async () => {
   const url = new URL("../../migrations/20261010130500_schedule_storage_purge.sql", import.meta.url);
   const sql = await Deno.readTextFile(url);
@@ -162,7 +238,7 @@ Deno.test("DEL-21 the migration alerts on unfinished rows", async () => {
 });
 
 function row(): DeletionQueueRow {
-  return { id: "queue-1", bucketId: "study-audio", objectPrefix: "parent/child/" };
+  return { id: "queue-1", bucketId: "kept-audio", objectPrefix: "parent/child/" };
 }
 
 function json(body: unknown): Response {
