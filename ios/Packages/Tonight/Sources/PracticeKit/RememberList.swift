@@ -90,6 +90,11 @@ public struct RememberList: Codable, Equatable, Sendable {
         return entries[index]
     }
 
+    /// Withdrawal removes every Remember word for this child, cleared or not.
+    public mutating func removeAll(childID: UUID) {
+        entries.removeAll { $0.childID == childID }
+    }
+
     public func active(childID: UUID? = nil) -> [RememberEntry] {
         entries
             .filter { !$0.isCleared && (childID == nil || $0.childID == childID) }
