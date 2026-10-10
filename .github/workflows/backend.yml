@@ -1,0 +1,39 @@
+name: Backend
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - backend-v1
+      - "cursor/**"
+
+jobs:
+  sarvam-proxy:
+    name: sarvam-proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Test sarvam-proxy
+        working-directory: backend/supabase/functions/sarvam-proxy
+        run: deno test --deny-net
+
+      - name: Test storage purge
+        run: |
+          if [ -f backend/supabase/functions/storage-purge/handler_test.ts ]; then
+            deno test --deny-net --cwd backend/supabase/functions/storage-purge
+          else
+            echo "storage-purge is not on this commit"
+          fi
+
+      - name: Check SQL migrations
+        run: |
+          python3 backend/scripts/check_migrations.py
+          python3 backend/scripts/check_deletion_sla.py
