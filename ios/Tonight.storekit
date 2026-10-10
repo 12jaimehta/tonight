@@ -1,0 +1,138 @@
+{
+  "identifier" : "Tonight",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_IN",
+    "_storefront" : "IND",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "E4A91C20",
+      "localizations" : [
+
+      ],
+      "name" : "Tonight",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "149",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "MONTHLY149",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Tonight for a month. No free trial.",
+              "displayName" : "Monthly",
+              "locale" : "en_IN"
+            }
+          ],
+          "productID" : "com.tonight.homework.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly",
+          "subscriptionGroupID" : "E4A91C20",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "999",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "ANNUAL999",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "ANNUAL7DAY",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "freeTrial",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "Tonight for a year, with a 7-day free trial.",
+              "displayName" : "Annual",
+              "locale" : "en_IN"
+            }
+          ],
+          "productID" : "com.tonight.homework.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Annual",
+          "subscriptionGroupID" : "E4A91C20",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

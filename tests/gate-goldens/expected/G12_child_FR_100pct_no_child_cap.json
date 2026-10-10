@@ -1,0 +1,35 @@
+{
+ "case": "G12_child_FR_100pct_no_child_cap",
+ "why": "One child FR 5/5 = 100%; pooled FR 5/905 -> passes (no per-child FR cap) -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "199/200",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/181",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "199/200",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/181",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

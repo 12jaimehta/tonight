@@ -1,0 +1,35 @@
+{
+ "case": "G22_recordings_with_empty_sides",
+ "why": "Each child has one all-correct-reference recording and one all-misread recording; neither fails the engine -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "113/115",
+  "false_accept_rate": "0",
+  "false_reject_rate": "2/95",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "113/115",
+  "false_accept_rate": "0",
+  "false_reject_rate": "2/95",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

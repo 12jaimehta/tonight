@@ -1,5 +1,6 @@
 import AuthKit
 import Foundation
+import os
 import PracticeKit
 import ProfilesKit
 import SwiftData
@@ -7,7 +8,7 @@ import TaskKit
 
 /// First store. There is no earlier schema, so the migration plan is empty.
 public enum TonightSchemaV1: VersionedSchema {
-    public static var versionIdentifier = Schema.Version(1, 0, 0)
+    public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
     public static var models: [any PersistentModel.Type] {
         [
@@ -94,6 +95,8 @@ public enum TonightSchemaV1: VersionedSchema {
         public var showMarkOverride: Bool?
         public var stars: Int?
         public var createdAt: Date
+        public var typingEnabled: Bool
+        public var passageSource: String?
 
         public init(
             id: UUID,
@@ -106,7 +109,9 @@ public enum TonightSchemaV1: VersionedSchema {
             photoPaths: String,
             showMarkOverride: Bool?,
             stars: Int?,
-            createdAt: Date
+            createdAt: Date,
+            typingEnabled: Bool = false,
+            passageSource: String? = nil
         ) {
             self.id = id
             self.childID = childID
@@ -119,6 +124,8 @@ public enum TonightSchemaV1: VersionedSchema {
             self.showMarkOverride = showMarkOverride
             self.stars = stars
             self.createdAt = createdAt
+            self.typingEnabled = typingEnabled
+            self.passageSource = passageSource
         }
 
         public convenience init(task: HomeworkTask) {
@@ -133,7 +140,9 @@ public enum TonightSchemaV1: VersionedSchema {
                 photoPaths: JSONText.encode(task.pagePhotoRefs.map(\.relativePath)),
                 showMarkOverride: task.showMarkOverride,
                 stars: task.stars,
-                createdAt: task.createdAt
+                createdAt: task.createdAt,
+                typingEnabled: task.typingEnabled,
+                passageSource: task.passageSource?.rawValue
             )
         }
 
@@ -151,7 +160,9 @@ public enum TonightSchemaV1: VersionedSchema {
                 media: [],
                 showMarkOverride: showMarkOverride,
                 stars: stars,
-                createdAt: createdAt
+                createdAt: createdAt,
+                typingEnabled: typingEnabled,
+                passageSource: passageSource.flatMap(ContentSourceKind.init(rawValue:))
             )
         }
     }
@@ -264,6 +275,14 @@ public enum TonightSchemaV1: VersionedSchema {
         }
     }
 
+    /// Stars a parent can award. Nil, 0, 4, and any other stored value are not a reward.
+    public enum StoredStarValue {
+        public static func validated(_ stars: Int?) -> Int? {
+            guard let stars else { return nil }
+            return ParentCheck(attemptID: UUID(), stars: stars)?.stars
+        }
+    }
+
     @Model
     public final class StoredParentCheck {
         @Attribute(.unique) public var id: UUID
@@ -282,9 +301,16 @@ public enum TonightSchemaV1: VersionedSchema {
             self.init(id: check.id, attemptID: check.attemptID, stars: check.stars, checkedAt: check.checkedAt)
         }
 
-        public func check() -> ParentCheck {
-            ParentCheck(id: id, attemptID: attemptID, stars: stars, checkedAt: checkedAt)
+        /// A stored count outside 1...3 is dropped. Reading it must not crash the app.
+        public func check() -> ParentCheck? {
+            guard let stars = StoredStarValue.validated(stars) else {
+                Self.repairLog.error("Dropping stored parent-check stars outside 1...3: \(self.stars, privacy: .private)")
+                return nil
+            }
+            return ParentCheck(id: id, attemptID: attemptID, stars: stars, checkedAt: checkedAt)
         }
+
+        private static let repairLog = Logger(subsystem: "com.tonight.homework", category: "StoredParentCheck")
     }
 
     @Model
@@ -377,10 +403,11 @@ public enum TonightMigrationPlan: SchemaMigrationPlan {
 
 public enum TonightStore {
     public static func makeContainer(at url: URL) throws -> ModelContainer {
+        try LocalProtection.prepareStoreDirectory(url.deletingLastPathComponent())
         let schema = Schema(versionedSchema: TonightSchemaV1.self)
         let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
         let container = try ModelContainer(
-            for: TonightSchemaV1.self,
+            for: schema,
             migrationPlan: TonightMigrationPlan.self,
             configurations: configuration
         )

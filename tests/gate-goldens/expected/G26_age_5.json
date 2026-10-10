@@ -1,0 +1,8 @@
+{
+ "case": "G26_age_5",
+ "why": "Age 5 -> OUT_OF_COHORT.",
+ "outcome": "OUT_OF_COHORT",
+ "children": [
+  "c00"
+ ]
+}

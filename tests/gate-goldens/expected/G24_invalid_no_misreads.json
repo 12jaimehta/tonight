@@ -1,0 +1,6 @@
+{
+ "case": "G24_invalid_no_misreads",
+ "why": "No ref-incorrect word anywhere -> INVALID_STUDY (pooled FA denominator 0).",
+ "outcome": "INVALID_STUDY",
+ "denominator": "false_accept"
+}

@@ -1,0 +1,35 @@
+{
+ "case": "G03_agreement_899_of_1000",
+ "why": "Agreement 899/1000: bar fails before rounding even though it displays 90.0%. FA 0, FR 101/1000 also fails.",
+ "outcome": "NO_GO",
+ "warnings": [],
+ "apple": {
+  "agreement": "899/1000",
+  "false_accept_rate": "0",
+  "false_reject_rate": "101/950",
+  "bars": {
+   "agreement_at_least_90": false,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": false
+  },
+  "passes": false
+ },
+ "sarvam": {
+  "agreement": "899/1000",
+  "false_accept_rate": "0",
+  "false_reject_rate": "101/950",
+  "bars": {
+   "agreement_at_least_90": false,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": false
+  },
+  "passes": false
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

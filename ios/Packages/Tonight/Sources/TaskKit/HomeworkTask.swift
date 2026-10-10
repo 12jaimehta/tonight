@@ -1,4 +1,5 @@
 import Foundation
+import MarkingKit
 
 public enum CheckMode: String, Codable, Hashable, Sendable {
     case auto
@@ -31,6 +32,15 @@ public enum HomeworkIssue: String, Equatable, Sendable {
     case autoNeedsConfirmedText
     case parentNeedsPhoto
     case starsOutOfRange
+}
+
+/// Rule failures from making a homework task. An array of issues is not itself an Error.
+public struct HomeworkRulesError: Error, Equatable, Sendable {
+    public var issues: [HomeworkIssue]
+
+    public init(issues: [HomeworkIssue]) {
+        self.issues = issues
+    }
 }
 
 public struct HomeworkDraft: Equatable, Sendable {
@@ -88,6 +98,10 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
     public var showMarkOverride: Bool?
     public var stars: Int?
     public var createdAt: Date
+    /// Parent-only, and only after the parental gate. The child cannot set this.
+    public private(set) var typingEnabled: Bool
+    /// Photo or paste that supplied the confirmed passage. Template is not stored.
+    public var passageSource: ContentSourceKind?
 
     /// v1 flow for this one subject. English is read-aloud. Anything else is a notebook photo.
     public var activityKind: String {
@@ -106,7 +120,9 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
         media: [MediaRef],
         showMarkOverride: Bool?,
         stars: Int?,
-        createdAt: Date
+        createdAt: Date,
+        typingEnabled: Bool = false,
+        passageSource: ContentSourceKind? = nil
     ) {
         self.id = id
         self.childID = childID
@@ -120,6 +136,18 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
         self.showMarkOverride = showMarkOverride
         self.stars = stars
         self.createdAt = createdAt
+        self.typingEnabled = typingEnabled
+        self.passageSource = passageSource
+    }
+
+    /// Turns typing on or off. Nil unless the editor is the parent and the gate just unlocked.
+    /// Notebook tasks are unchanged: parent stars stay the check.
+    public func settingTypingEnabled(_ enabled: Bool, editor: TaskEditor, gateUnlocked: Bool) -> HomeworkTask? {
+        guard checkMode == .auto else { return nil }
+        guard TypingAccess.canEnable(editor: editor, gateUnlocked: gateUnlocked) else { return nil }
+        var copy = self
+        copy.typingEnabled = enabled
+        return copy
     }
 
     public static func make(
@@ -132,8 +160,9 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
         confirmedText: String? = nil,
         pagePhotoRefs: [PhotoRef] = [],
         stars: Int? = nil,
+        passageSource: ContentSourceKind? = nil,
         createdAt: Date = Date()
-    ) -> Result<HomeworkTask, [HomeworkIssue]> {
+    ) -> Result<HomeworkTask, HomeworkRulesError> {
         let draft = HomeworkDraft(
             subjectID: subjectID,
             checkMode: checkMode,
@@ -142,7 +171,7 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
             stars: stars
         )
         let issues = HomeworkRules.issues(for: draft)
-        guard issues.isEmpty else { return .failure(issues) }
+        guard issues.isEmpty else { return .failure(HomeworkRulesError(issues: issues)) }
         return .success(HomeworkTask(
             id: id,
             childID: childID,
@@ -155,7 +184,9 @@ public struct HomeworkTask: Codable, Hashable, Sendable, Identifiable {
             media: [],
             showMarkOverride: nil,
             stars: stars,
-            createdAt: createdAt
+            createdAt: createdAt,
+            typingEnabled: false,
+            passageSource: checkMode == .auto ? passageSource : nil
         ))
     }
 }

@@ -1,16 +1,30 @@
 import AVFoundation
 import Foundation
-import Speech
+@preconcurrency import Speech
+import os
 
 public final class FakeSpeechEngine: SpeechRecognizing, @unchecked Sendable {
     public let engineID: SpeechEngineID
-    public var scripted: SpeechEngineOutcome
-    public private(set) var calls = 0
-    private let lock = NSLock()
+    private let state: OSAllocatedUnfairLock<State>
+
+    private struct State: Sendable {
+        var scripted: SpeechEngineOutcome
+        var calls: Int
+    }
+
+    public var scripted: SpeechEngineOutcome {
+        get { state.withLock { $0.scripted } }
+        set { state.withLock { $0.scripted = newValue } }
+    }
+
+    public private(set) var calls: Int {
+        get { state.withLock { $0.calls } }
+        set { state.withLock { $0.calls = newValue } }
+    }
 
     public init(engineID: SpeechEngineID = .fake, scripted: SpeechEngineOutcome) {
         self.engineID = engineID
-        self.scripted = scripted
+        self.state = OSAllocatedUnfairLock(initialState: State(scripted: scripted, calls: 0))
     }
 
     public func availability(locale: String) async -> SpeechAvailability {
@@ -19,10 +33,10 @@ public final class FakeSpeechEngine: SpeechRecognizing, @unchecked Sendable {
     }
 
     public func transcribe(audio: SpeechAudio, locale: String) async -> SpeechEngineOutcome {
-        lock.lock()
-        calls += 1
-        lock.unlock()
-        return scripted
+        state.withLock { state in
+            state.calls += 1
+            return state.scripted
+        }
     }
 }
 
@@ -96,7 +110,7 @@ enum SpeechAnalyzerAvailability {
             continuation.finish()
             try await analyzer.finalizeAndFinishThroughEndOfInput()
             var text = ""
-            for try await result in transcriber.results where !result.isVolatile {
+            for try await result in transcriber.results where result.isFinal {
                 text += String(result.text.characters)
             }
             return .transcript(SpeechRecognitionResult(transcript: text, words: [], engineID: .appleOnDevice))
@@ -121,17 +135,15 @@ enum SpeechAnalyzerAvailability {
 }
 
 final class ResumeOnce: @unchecked Sendable {
-    private let lock = NSLock()
-    private var done = false
-    func resume(_ body: () -> Void) {
-        lock.lock()
-        if done {
-            lock.unlock()
-            return
+    private let done = OSAllocatedUnfairLock(initialState: false)
+
+    func resume(_ body: @Sendable () -> Void) {
+        let shouldRun = done.withLock { (done: inout Bool) -> Bool in
+            if done { return false }
+            done = true
+            return true
         }
-        done = true
-        lock.unlock()
-        body()
+        if shouldRun { body() }
     }
 }
 
@@ -151,20 +163,24 @@ struct SFSpeechOnDeviceSession {
         let gate = ResumeOnce()
         return await withCheckedContinuation { continuation in
             recognizer.recognitionTask(with: request) { result, error in
+                // Copy Sendable fields here. The resume closure must not capture
+                // SFSpeechRecognitionResult, which the recognition callback may treat as non-Sendable.
                 guard result?.isFinal == true || error != nil else { return }
-                gate.resume {
-                    if let result {
-                        let words = result.bestTranscription.segments.map {
-                            RecognizedWord(text: $0.substring, start: $0.timestamp, duration: $0.duration)
-                        }
-                        continuation.resume(returning: .transcript(SpeechRecognitionResult(
-                            transcript: result.bestTranscription.formattedString,
-                            words: words,
-                            engineID: .appleOnDevice
-                        )))
-                    } else {
-                        continuation.resume(returning: .unavailable("On-device recognition failed"))
+                let outcome: SpeechEngineOutcome
+                if let result {
+                    let words = result.bestTranscription.segments.map {
+                        RecognizedWord(text: $0.substring, start: $0.timestamp, duration: $0.duration)
                     }
+                    outcome = .transcript(SpeechRecognitionResult(
+                        transcript: result.bestTranscription.formattedString,
+                        words: words,
+                        engineID: .appleOnDevice
+                    ))
+                } else {
+                    outcome = .unavailable("On-device recognition failed")
+                }
+                gate.resume {
+                    continuation.resume(returning: outcome)
                 }
             }
         }
@@ -247,16 +263,43 @@ public final class IndianEnglishSpeech: NSObject, SpeechSynthesizing, AVSpeechSy
     }
 
     public func speak(_ text: String, rate: Float = passageRate) async {
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice.speechVoices().first {
-            $0.language.replacingOccurrences(of: "_", with: "-").lowercased().hasPrefix("en-in")
-        } ?? AVSpeechSynthesisVoice(language: "en-IN")
-        utterance.rate = min(max(AVSpeechUtteranceDefaultSpeechRate * rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
-        synthesizer.stopSpeaking(at: .immediate)
-        synthesizer.speak(utterance)
+        await MainActor.run {
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = AVSpeechSynthesisVoice.speechVoices().first {
+                $0.language.replacingOccurrences(of: "_", with: "-").lowercased().hasPrefix("en-in")
+            } ?? AVSpeechSynthesisVoice(language: "en-IN")
+            utterance.rate = min(max(AVSpeechUtteranceDefaultSpeechRate * rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+            self.synthesizer.stopSpeaking(at: .immediate)
+            self.synthesizer.speak(utterance)
+        }
     }
 
     public func stop() {
-        synthesizer.stopSpeaking(at: .immediate)
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                self.synthesizer.stopSpeaking(at: .immediate)
+            }
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    self.synthesizer.stopSpeaking(at: .immediate)
+                }
+            }
+        }
+    }
+}
+
+/// Hear it and Hear word. Callers pass `IndianEnglishSpeech` or a test double.
+public enum SpokenCue {
+    public static func passage(_ text: String, using speech: any SpeechSynthesizing) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await speech.speak(trimmed, rate: IndianEnglishSpeech.passageRate)
+    }
+
+    public static func word(_ text: String, using speech: any SpeechSynthesizing) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await speech.speak(trimmed, rate: IndianEnglishSpeech.wordRate)
     }
 }

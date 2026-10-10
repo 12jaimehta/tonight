@@ -1,0 +1,35 @@
+{
+ "case": "G19_apple_fails_sarvam_passes_small_delta",
+ "why": "Apple FR 11% fails; Sarvam passes; delta only +3pp -> SARVAM (MET-36).",
+ "outcome": "SARVAM",
+ "warnings": [],
+ "apple": {
+  "agreement": "9/10",
+  "false_accept_rate": "0",
+  "false_reject_rate": "11/100",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": false
+  },
+  "passes": false
+ },
+ "sarvam": {
+  "agreement": "51/55",
+  "false_accept_rate": "0",
+  "false_reject_rate": "2/25",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "3/110",
+ "ci": {
+  "low": "3/110",
+  "high": "3/110"
+ }
+}

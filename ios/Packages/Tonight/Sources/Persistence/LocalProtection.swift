@@ -11,6 +11,19 @@ public enum LocalProtection {
         )
     }
 
+    /// Creates the store directory, excludes it from backup, and sets protection before the container opens.
+    public static func prepareStoreDirectory(_ directory: URL) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var copy = directory
+        try copy.setResourceValues(values)
+        try FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUnlessOpen],
+            ofItemAtPath: directory.path
+        )
+    }
+
     /// Protects the store file and its sidecars once they exist.
     public static func protectStore(at url: URL) throws {
         for suffix in ["", "-wal", "-shm"] {
@@ -26,11 +39,11 @@ public enum PhotoFilePolicy {
     public static func write(_ data: Data, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: [.atomic, .completeFileProtection])
-        try LocalProtection.protect(url)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         var copy = url
         try copy.setResourceValues(values)
+        try LocalProtection.protect(url)
     }
 
     public static func isExcludedFromBackup(_ url: URL) throws -> Bool {

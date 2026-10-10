@@ -1,6 +1,8 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+let speechSwiftSettings: [SwiftSetting] = Context.environment["TONIGHT_STUDY_BUILD"] == "1" ? [.define("STUDY")] : []
+
 let package = Package(
     name: "Tonight",
     platforms: [.iOS(.v17)],
@@ -16,6 +18,7 @@ let package = Package(
         .library(name: "PaywallKit", targets: ["PaywallKit"]),
         .library(name: "Persistence", targets: ["Persistence"]),
         .library(name: "Telemetry", targets: ["Telemetry"]),
+        .library(name: "GateHarness", targets: ["GateHarness"]),
     ],
     targets: [
         .target(name: "DesignSystem"),
@@ -28,8 +31,12 @@ let package = Package(
             resources: [.copy("Fixtures")]
         ),
 
-        .target(name: "SpeechKit"),
-        .testTarget(name: "SpeechKitTests", dependencies: ["SpeechKit"]),
+        .target(name: "SpeechKit", swiftSettings: speechSwiftSettings),
+        .testTarget(
+            name: "SpeechKitTests",
+            dependencies: ["SpeechKit"],
+            resources: [.copy("Fixtures")]
+        ),
 
         .target(name: "AuthKit"),
         .testTarget(name: "AuthKitTests", dependencies: ["AuthKit"]),
@@ -43,8 +50,8 @@ let package = Package(
         .target(name: "CaptureKit"),
         .testTarget(name: "CaptureKitTests", dependencies: ["CaptureKit"]),
 
-        .target(name: "PracticeKit"),
-        .testTarget(name: "PracticeKitTests", dependencies: ["PracticeKit"]),
+        .target(name: "PracticeKit", dependencies: ["MarkingKit"]),
+        .testTarget(name: "PracticeKitTests", dependencies: ["PracticeKit", "MarkingKit"]),
 
         .target(name: "PaywallKit"),
         .testTarget(name: "PaywallKitTests", dependencies: ["PaywallKit"]),
@@ -55,10 +62,17 @@ let package = Package(
         ),
         .testTarget(
             name: "PersistenceTests",
-            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit"]
+            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit", "CaptureKit"]
         ),
 
         .target(name: "Telemetry"),
         .testTarget(name: "TelemetryTests", dependencies: ["Telemetry"]),
+
+        .target(name: "GateHarness"),
+        .testTarget(
+            name: "GateHarnessTests",
+            dependencies: ["GateHarness"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

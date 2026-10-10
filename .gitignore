@@ -23,6 +23,13 @@
 # misc
 .DS_Store
 *.pem
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+
+# Local Supabase URL and anon key. Config.example.xcconfig stays tracked.
+ios/Config/Local.xcconfig
 
 # debug
 npm-debug.log*
@@ -33,6 +40,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !backend/.env.example
+ios/Config/Local.xcconfig
 
 # vercel
 .vercel

@@ -8,18 +8,18 @@ import Foundation
 /// - `don't` stays one token, then folds to `dont` so a missing apostrophe still matches.
 /// - Devanagari vowel signs and nukta stay attached (`किताब` is not split into `क त ब`).
 ///
-/// Case folding uses Unicode default lowercase, not `Locale.current`.
+/// Case folding uses Unicode default lowercase. The device locale is not consulted.
 public enum ReadingNormalizer {
     public static func tokens(in text: String) -> [String] {
         let folded = text.precomposedStringWithCompatibilityMapping.lowercased()
         let scalars = Array(folded.unicodeScalars)
-        var tokens: [String] = []
+        var pieces: [Piece] = []
         var word = ""
         var index = 0
 
         func flushWord() {
             guard !word.isEmpty else { return }
-            tokens.append(canonicalizeWord(word))
+            pieces.append(.word(word))
             word = ""
         }
 
@@ -30,9 +30,15 @@ public enum ReadingNormalizer {
                 continue
             }
             if isDigit(scalar) {
+                // "word12" is one token. A digit only starts a number when it is not already inside a word.
+                if !word.isEmpty {
+                    word.unicodeScalars.append(asciiDigit(scalar))
+                    index += 1
+                    continue
+                }
                 flushWord()
                 let (token, next) = consumeNumber(scalars, from: index)
-                tokens.append(token)
+                pieces.append(.number(token))
                 index = next
                 continue
             }
@@ -61,7 +67,55 @@ public enum ReadingNormalizer {
             index += 1
         }
         flushWord()
-        return tokens
+        return mergeNumberWords(pieces)
+    }
+
+    /// Adjacent number words such as "twenty five" are one value. A hyphen is not required.
+    /// "twenty first" is the ordinal 21st, not the cardinal 20 followed by first.
+    private static func mergeNumberWords(_ pieces: [Piece]) -> [String] {
+        var output: [String] = []
+        var index = 0
+        while index < pieces.count {
+            if case .word(let head) = pieces[index],
+               index + 1 < pieces.count,
+               case .word(let tail) = pieces[index + 1],
+               let ordinal = OrdinalWords.combine(head, tail) {
+                output.append(ordinal)
+                index += 2
+                continue
+            }
+            if case .word(let first) = pieces[index], NumberWords.isPart(first) {
+                var end = index
+                var bestEnd = index
+                var best: Decimal?
+                while end < pieces.count {
+                    guard case .word(let part) = pieces[end], NumberWords.isPart(part) else { break }
+                    end += 1
+                    let phrase = pieces[index..<end].compactMap { piece -> String? in
+                        if case .word(let word) = piece { return word }
+                        return nil
+                    }.joined(separator: " ")
+                    let words = phrase.split(separator: " ").map(String.init)
+                    if NumberWords.isCompound(words), let value = NumberWords.parse(phrase) {
+                        bestEnd = end
+                        best = value
+                    }
+                }
+                if let best {
+                    output.append(plain(best))
+                    index = bestEnd
+                    continue
+                }
+            }
+            switch pieces[index] {
+            case .number(let number):
+                output.append(number)
+            case .word(let word):
+                output.append(canonicalizeWord(word))
+            }
+            index += 1
+        }
+        return output
     }
 
     /// Idempotent on its own output: tokenising the joined tokens again is stable
@@ -69,6 +123,9 @@ public enum ReadingNormalizer {
     public static func canonicalizeWord(_ raw: String) -> String {
         let stripped = raw.unicodeScalars.filter { !isApostrophe($0) }
         let word = String(String.UnicodeScalarView(stripped))
+        if let ordinal = OrdinalWords.canonical(word) {
+            return ordinal
+        }
         if let number = numberWordValue(word) {
             return plain(number)
         }
@@ -80,34 +137,65 @@ public enum ReadingNormalizer {
         var raw = ""
         while index < scalars.count {
             let scalar = scalars[index]
-            if isDigit(scalar) || scalar == "," || scalar == "." {
+            if isDigit(scalar) || scalar == "," {
                 raw.unicodeScalars.append(scalar)
                 index += 1
-            } else if isIgnorable(scalar) {
-                index += 1
-            } else {
+                continue
+            }
+            // A dot is a decimal point only when a digit follows. "3.5." keeps the sentence period.
+            if scalar == "." {
+                let next = index + 1
+                if next < scalars.count, isDigit(scalars[next]) {
+                    raw.unicodeScalars.append(scalar)
+                    index += 1
+                    continue
+                }
                 break
             }
-        }
-        if let canonical = canonicalNumber(raw) {
-            return (canonical, index)
-        }
-        // Malformed grouping: keep only the leading digits and rescan the rest.
-        var digits = ""
-        var consumed = start
-        while consumed < scalars.count, isDigit(scalars[consumed]) || isIgnorable(scalars[consumed]) {
-            if isDigit(scalars[consumed]) {
-                digits.unicodeScalars.append(asciiDigit(scalars[consumed]))
+            if isIgnorable(scalar) {
+                index += 1
+                continue
             }
-            consumed += 1
+            break
         }
-        if consumed == start { consumed += 1 }
-        return (digits.isEmpty ? raw : plainIntegerDigits(digits), consumed)
+        let token: String
+        let consumed: Int
+        if let canonical = canonicalNumber(raw), !raw.isEmpty {
+            token = canonical
+            consumed = index
+        } else {
+            // Malformed grouping: keep only the leading digits and rescan the rest.
+            var digits = ""
+            var fallback = start
+            while fallback < scalars.count, isDigit(scalars[fallback]) || isIgnorable(scalars[fallback]) {
+                if isDigit(scalars[fallback]) {
+                    digits.unicodeScalars.append(asciiDigit(scalars[fallback]))
+                }
+                fallback += 1
+            }
+            if fallback == start { fallback += 1 }
+            token = digits.isEmpty ? raw : plainIntegerDigits(digits)
+            consumed = fallback
+        }
+        return consumeOrdinal(token, scalars: scalars, index: consumed)
+    }
+
+    /// "3rd" stays the ordinal 3rd, so it matches "third" and not the cardinal "three".
+    /// The suffix is chosen from the number. Device locale is not consulted.
+    static func consumeOrdinal(_ token: String, scalars: [Unicode.Scalar], index: Int) -> (String, Int) {
+        guard !token.contains("."), let value = Int(token), value > 0 else { return (token, index) }
+        let suffix = Array(OrdinalWords.suffix(for: value).unicodeScalars)
+        let end = index + suffix.count
+        guard end <= scalars.count else { return (token, index) }
+        guard zip(suffix, scalars[index..<end]).allSatisfy({ $0 == $1 }) else { return (token, index) }
+        if end < scalars.count, isLetter(scalars[end]) || isMark(scalars[end]) { return (token, index) }
+        return (token + OrdinalWords.suffix(for: value), end)
     }
 
     static func canonicalNumber(_ raw: String) -> String? {
-        let mapped = String(raw.unicodeScalars.map { asciiDigit($0) })
-        let cleaned = mapped.filter { !isIgnorable($0) }
+        // `map` yields `[Unicode.Scalar]`, which is not a `String` element sequence.
+        let scalars = raw.unicodeScalars.map { asciiDigit($0) }.filter { !isIgnorable($0) }
+        let cleaned = String(String.UnicodeScalarView(scalars))
         if cleaned.contains(".") {
             let pieces = cleaned.split(separator: ".", omittingEmptySubsequences: false)
             guard pieces.count == 2 else { return nil }
@@ -143,7 +231,9 @@ public enum ReadingNormalizer {
 
     static func plain(_ value: Decimal) -> String {
         let number = value as NSDecimalNumber
-        if value == Decimal(integerLiteral: (number as Decimal).intValue) && value.exponent >= 0 {
+        // Keep the exact digit string when the decimal is already an integer.
+        // `Decimal` has no `intValue`; integrality is value == rounded-to-0-places.
+        if value.exponent >= 0 && isIntegral(value) {
             return number.stringValue
         }
         var copy = value
@@ -157,6 +247,14 @@ public enum ReadingNormalizer {
             return trimmed
         }
         return text
+    }
+
+    /// True when rounding to zero decimal places does not change the value.
+    private static func isIntegral(_ value: Decimal) -> Bool {
+        var source = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &source, 0, .plain)
+        return value == rounded
     }
 
     private static func parsePlainDecimal(_ whole: String, fraction: String) -> Decimal? {
@@ -248,7 +346,82 @@ public enum ReadingNormalizer {
     ]
 }
 
+private enum Piece {
+    case number(String)
+    case word(String)
+}
+
+/// English ordinals for en-IN. The forms are written out here. The device locale is not consulted.
+enum OrdinalWords {
+    static func canonical(_ raw: String) -> String? {
+        let parts = raw.replacingOccurrences(of: "-", with: " ").split(separator: " ").map(String.init)
+        if parts.count == 1 { return singles[parts[0]] }
+        if parts.count == 2 { return combine(parts[0], parts[1]) }
+        return nil
+    }
+
+    static func combine(_ head: String, _ tail: String) -> String? {
+        guard let tens = tens[head], let unit = units[tail] else { return nil }
+        let value = tens + unit
+        guard (1...31).contains(value) else { return nil }
+        return "\(value)\(suffix(for: value))"
+    }
+
+    static func suffix(for value: Int) -> String {
+        let lastTwo = value % 100
+        if (11...13).contains(lastTwo) { return "th" }
+        switch value % 10 {
+        case 1: return "st"
+        case 2: return "nd"
+        case 3: return "rd"
+        default: return "th"
+        }
+    }
+
+    private static let units: [String: Int] = [
+        "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+        "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9,
+    ]
+
+    private static let tens: [String: Int] = [
+        "twenty": 20,
+        "thirty": 30,
+    ]
+
+    private static let singles: [String: String] = [
+        "first": "1st", "second": "2nd", "third": "3rd", "fourth": "4th", "fifth": "5th",
+        "sixth": "6th", "seventh": "7th", "eighth": "8th", "ninth": "9th", "tenth": "10th",
+        "eleventh": "11th", "twelfth": "12th", "thirteenth": "13th", "fourteenth": "14th",
+        "fifteenth": "15th", "sixteenth": "16th", "seventeenth": "17th", "eighteenth": "18th",
+        "nineteenth": "19th", "twentieth": "20th", "thirtieth": "30th",
+    ]
+}
+
 enum NumberWords {
+    static func isPart(_ word: String) -> Bool {
+        if word.contains("-") { return parse(word.replacingOccurrences(of: "-", with: " ")) != nil }
+        return small[word] != nil || multipliers[word] != nil
+    }
+
+    /// "twenty five" and "one hundred twenty five" are compounds. "one two three" stays separate words.
+    static func isCompound(_ parts: [String]) -> Bool {
+        guard !parts.isEmpty, parts.allSatisfy(isPart) else { return false }
+        if parts.count == 1 { return true }
+        if parts.contains(where: { multipliers[$0] != nil }) {
+            return parse(parts.joined(separator: " ")) != nil
+        }
+        guard parts.count == 2, let head = small[parts[0]], let tail = small[parts[1]] else { return false }
+        return isTens(head) && isUnit(tail)
+    }
+
+    private static func isTens(_ value: Decimal) -> Bool {
+        [20, 30, 40, 50, 60, 70, 80, 90].contains { $0 == value }
+    }
+
+    private static func isUnit(_ value: Decimal) -> Bool {
+        (1...9).contains { Decimal($0) == value }
+    }
+
     static func parse(_ text: String) -> Decimal? {
         let parts = text.split(separator: " ").map(String.init).filter { !$0.isEmpty }
         guard !parts.isEmpty else { return nil }

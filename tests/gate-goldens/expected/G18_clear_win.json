@@ -1,0 +1,35 @@
+{
+ "case": "G18_clear_win",
+ "why": "Both pass; uniform +6pp; Sarvam FA better -> SARVAM.",
+ "outcome": "SARVAM",
+ "warnings": [],
+ "apple": {
+  "agreement": "23/25",
+  "false_accept_rate": "1/20",
+  "false_reject_rate": "7/80",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "99/100",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/80",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "7/100",
+ "ci": {
+  "low": "7/100",
+  "high": "7/100"
+ }
+}

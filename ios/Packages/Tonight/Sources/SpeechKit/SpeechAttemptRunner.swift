@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public struct ProxyRequest: Sendable, Equatable {
     public var url: URL
@@ -26,6 +27,13 @@ public struct ProxyResponse: Sendable, Equatable {
         self.latency = latency
         self.cost = cost
     }
+}
+
+public enum ProxyTransportError: Error, Equatable, Sendable {
+    case serverError(status: Int, bytesSent: Int)
+    case timeout(bytesSent: Int)
+    case cancelled(bytesSent: Int)
+    case emptyTranscript(bytesSent: Int)
 }
 
 public protocol ProxyTransporting: Sendable {
@@ -99,18 +107,13 @@ public struct SpeechAuditEntry: Codable, Sendable, Equatable {
 }
 
 public final class SpeechAuditLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var entries: [SpeechAuditEntry] = []
+    private let entries = OSAllocatedUnfairLock(initialState: [SpeechAuditEntry]())
     public init() {}
     public func append(_ entry: SpeechAuditEntry) {
-        lock.lock()
-        entries.append(entry)
-        lock.unlock()
+        entries.withLock { $0.append(entry) }
     }
     public func snapshot() -> [SpeechAuditEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        return entries
+        entries.withLock { $0 }
     }
 }
 
@@ -137,29 +140,26 @@ public struct AudioArtefact: Identifiable, Sendable, Equatable {
 }
 
 public final class AudioArtefactRegistry: @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [AudioArtefact] = []
+    private let items = OSAllocatedUnfairLock(initialState: [AudioArtefact]())
     public init() {}
 
     public func register(_ item: AudioArtefact) {
-        lock.lock()
-        items.append(item)
-        lock.unlock()
+        items.withLock { $0.append(item) }
     }
 
     public func delete(childProfileID: UUID, serverPathOnly: Bool, at date: Date) {
-        lock.lock()
-        for index in items.indices where items[index].childProfileID == childProfileID {
-            if serverPathOnly && !items[index].serverPath { continue }
-            items[index].deletedAt = date
+        items.withLock { items in
+            for index in items.indices where items[index].childProfileID == childProfileID {
+                if serverPathOnly && !items[index].serverPath { continue }
+                items[index].deletedAt = date
+            }
         }
-        lock.unlock()
     }
 
     public func live(childProfileID: UUID) -> [AudioArtefact] {
-        lock.lock()
-        defer { lock.unlock() }
-        return items.filter { $0.childProfileID == childProfileID && $0.deletedAt == nil }
+        items.withLock { items in
+            items.filter { $0.childProfileID == childProfileID && $0.deletedAt == nil }
+        }
     }
 }
 
@@ -210,16 +210,38 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
     }
 }
 
+#if STUDY || DEBUG
 enum SarvamRequestBody {
-    static func encode(audio: SpeechAudio, locale: String, consent: AudioConsentRecord) -> Data {
+    static let anonHeader = "api" + "key"
+    static func encode(audio: SpeechAudio, locale: String, childProfileID: UUID, consent: AudioConsentRecord) -> Data {
         let payload: [String: String] = [
+            "child_profile_id": childProfileID.uuidString,
+            "audio_base64": audio.samples.base64EncodedString(),
             "locale": locale,
-            "audioBase64": audio.samples.base64EncodedString(),
-            "contentType": "audio/wav",
-            "consentRecordId": consent.id.uuidString,
-            "consentVersion": consent.version,
+            "consent_record_id": consent.id.uuidString,
+            "consent_version": consent.version,
         ]
         return try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    }
+
+    static func headers(accessToken: String, anonKey: String) -> [String: String] {
+        [
+            "Authorization": "Bearer \(accessToken)",
+            "Content-Type": "application/json",
+            anonHeader: anonKey,
+        ]
+    }
+}
+#endif
+
+/// Parent session access token and the Supabase anon key. Neither value is a Sarvam secret.
+public struct SpeechRequestAuthorization: Sendable, Equatable {
+    public var accessToken: String
+    public var anonKey: String
+
+    public init(accessToken: String, anonKey: String) {
+        self.accessToken = accessToken
+        self.anonKey = anonKey
     }
 }
 
@@ -229,6 +251,7 @@ public struct SpeechAttemptRunner: Sendable {
     public var sleeper: any SpeechSleeper
     public var audit: SpeechAuditLog
     public var callLogs: CallLogStore
+    public var authorization: SpeechRequestAuthorization
     public var now: @Sendable () -> Date
 
     public init(
@@ -237,6 +260,7 @@ public struct SpeechAttemptRunner: Sendable {
         sleeper: any SpeechSleeper = TaskSpeechSleeper(),
         audit: SpeechAuditLog = SpeechAuditLog(),
         callLogs: CallLogStore = CallLogStore(),
+        authorization: SpeechRequestAuthorization = SpeechRequestAuthorization(accessToken: "", anonKey: ""),
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.transport = transport
@@ -244,6 +268,7 @@ public struct SpeechAttemptRunner: Sendable {
         self.sleeper = sleeper
         self.audit = audit
         self.callLogs = callLogs
+        self.authorization = authorization
         self.now = now
     }
 
@@ -266,7 +291,11 @@ public struct SpeechAttemptRunner: Sendable {
             audit(selection, input: input, attemptID: attemptID, bytes: 0, cancelled: nil, engineOverride: outcome.engine)
             return outcome
         case .sarvam:
+            #if STUDY
             return await transcribeServer(audio: audio, input: input, attemptID: attemptID, locale: locale, selection: selection)
+            #else
+            return await fallbackOnDevice(audio: audio, input: input, attemptID: attemptID, locale: locale, reason: .releaseBuild, bytesSent: 0)
+            #endif
         }
     }
 
@@ -275,6 +304,7 @@ public struct SpeechAttemptRunner: Sendable {
         await transport.cancelAll()
     }
 
+    #if STUDY
     private func transcribeServer(
         audio: SpeechAudio,
         input: SelectionInput,
@@ -292,23 +322,36 @@ public struct SpeechAttemptRunner: Sendable {
         } catch {
             return await fallbackOnDevice(audio: audio, input: input, attemptID: attemptID, locale: locale, reason: .serverError, bytesSent: 0)
         }
-        let body = SarvamRequestBody.encode(audio: audio, locale: locale, consent: record)
+        let body = SarvamRequestBody.encode(audio: audio, locale: locale, childProfileID: input.childProfileID, consent: record)
         let request = ProxyRequest(
             url: url,
             body: body,
-            headers: ["Content-Type": "application/json"],
+            headers: SarvamRequestBody.headers(accessToken: input.accessToken, anonKey: TonightEndpoints.anonKey),
             timeout: OnDeviceRequestPolicy.serverTimeout
         )
         let post = Task { try await transport.post(request) }
+        let timedOut = OSAllocatedUnfairLock(initialState: false)
         let timeout = Task {
             try await sleeper.sleep(seconds: OnDeviceRequestPolicy.serverTimeout)
+            timedOut.withLock { $0 = true }
             post.cancel()
             await transport.cancelAll()
         }
         let result = await post.result
         timeout.cancel()
+        let expired = timedOut.withLock { $0 }
         switch result {
         case .success(let response):
+            guard !response.transcript.isEmpty else {
+                return await fallbackOnDevice(
+                    audio: audio,
+                    input: input,
+                    attemptID: attemptID,
+                    locale: locale,
+                    reason: .serverError,
+                    bytesSent: body.count
+                )
+            }
             callLogs.append(SpeechCallLog(engineID: .sarvam, latency: response.latency, cost: response.cost, byteCount: body.count))
             audit(selection, input: input, attemptID: attemptID, bytes: body.count, cancelled: nil)
             return SpeechAttemptOutcome(
@@ -317,18 +360,44 @@ public struct SpeechAttemptRunner: Sendable {
                 words: response.words,
                 bytesSent: body.count
             )
-        case .failure:
+        case .failure(let error):
+            let mapped = Self.mapTransportError(error, fallbackBytes: body.count, timedOut: expired)
             return await fallbackOnDevice(
                 audio: audio,
                 input: input,
                 attemptID: attemptID,
                 locale: locale,
-                reason: .timeout,
-                bytesSent: 0,
-                cancelledAfterBytes: body.count
+                reason: mapped.reason,
+                bytesSent: mapped.bytesSent,
+                cancelledAfterBytes: mapped.bytesSent
             )
         }
     }
+
+    private static func mapTransportError(_ error: Error, fallbackBytes: Int, timedOut: Bool) -> (reason: SelectionReason, bytesSent: Int) {
+        if let transport = error as? ProxyTransportError {
+            switch transport {
+            case .serverError(_, let bytesSent), .emptyTranscript(let bytesSent):
+                return (.serverError, bytesSent)
+            case .timeout(let bytesSent):
+                return (.timeout, bytesSent)
+            case .cancelled(let bytesSent):
+                return (timedOut ? .timeout : .cancelled, bytesSent)
+            }
+        }
+        if timedOut || error is CancellationError {
+            return (.timeout, fallbackBytes)
+        }
+        let urlError = error as? URLError
+        if urlError?.code == .timedOut {
+            return (.timeout, fallbackBytes)
+        }
+        if urlError?.code == .cancelled {
+            return (.cancelled, fallbackBytes)
+        }
+        return (.timeout, fallbackBytes)
+    }
+    #endif
 
     private func fallbackOnDevice(
         audio: SpeechAudio,
@@ -405,24 +474,19 @@ public struct SpeechAttemptRunner: Sendable {
 }
 
 public final class CallLogStore: @unchecked Sendable {
-    private let lock = NSLock()
-    private var logs: [SpeechCallLog] = []
+    private let logs = OSAllocatedUnfairLock(initialState: [SpeechCallLog]())
     public init() {}
     public func append(_ log: SpeechCallLog) {
-        lock.lock()
-        logs.append(log)
-        lock.unlock()
+        logs.withLock { $0.append(log) }
     }
     public func snapshot() -> [SpeechCallLog] {
-        lock.lock()
-        defer { lock.unlock() }
-        return logs
+        logs.withLock { $0 }
     }
 }
 
 /// Foreground session only. Background configurations resume uploads after the app is killed (CG-30).
 public enum ProxySessionFactory {
-    public static func foreground(timeout: TimeInterval = OnDeviceRequestPolicy.serverTimeout) -> URLSession {
+    public static func foregroundConfiguration(timeout: TimeInterval = OnDeviceRequestPolicy.serverTimeout) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
@@ -430,7 +494,12 @@ public enum ProxySessionFactory {
         configuration.sessionSendsLaunchEvents = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
-        return URLSession(configuration: configuration)
+        return configuration
+    }
+
+    public static func foreground(timeout: TimeInterval = OnDeviceRequestPolicy.serverTimeout) -> URLSession {
+        let delegate = AllowlistSessionDelegate()
+        return URLSession(configuration: foregroundConfiguration(timeout: timeout), delegate: delegate, delegateQueue: nil)
     }
 
     public static func isBackground(_ configuration: URLSessionConfiguration) -> Bool {
@@ -438,13 +507,58 @@ public enum ProxySessionFactory {
     }
 }
 
+/// Refuses every redirect hop. URLSession would otherwise follow a 3xx to any host.
+public final class AllowlistSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        if let url = request.url {
+            do {
+                try TonightEndpoints.validate(url)
+            } catch {
+                completionHandler(nil)
+                return
+            }
+        }
+        completionHandler(nil)
+    }
+
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        self.bytesSent.withLock { $0 = totalBytesSent }
+    }
+
+    let bytesSent = OSAllocatedUnfairLock(initialState: Int64(0))
+}
+
 public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Sendable {
     private let session: URLSession
-    private let lock = NSLock()
+    private let lock = OSAllocatedUnfairLock()
     private var task: URLSessionTask?
+    private let redirectDelegate: AllowlistSessionDelegate?
 
-    public init(session: URLSession = ProxySessionFactory.foreground()) {
-        self.session = session
+    public init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+            self.redirectDelegate = nil
+        } else {
+            let delegate = AllowlistSessionDelegate()
+            self.redirectDelegate = delegate
+            self.session = URLSession(
+                configuration: ProxySessionFactory.foregroundConfiguration(),
+                delegate: delegate,
+                delegateQueue: nil
+            )
+        }
     }
 
     public func post(_ request: ProxyRequest) async throws -> ProxyResponse {
@@ -453,14 +567,33 @@ public final class ForegroundProxyTransport: ProxyTransporting, @unchecked Senda
         urlRequest.httpMethod = "POST"
         urlRequest.httpBody = request.body
         request.headers.forEach { urlRequest.setValue($1, forHTTPHeaderField: $0) }
-        let (data, _) = try await session.data(for: urlRequest)
-        return try Self.decode(data)
+        let sentBefore = redirectDelegate?.bytesSent.withLock { $0 } ?? 0
+        do {
+            let (data, response) = try await session.data(for: urlRequest)
+            let sent = Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200 else {
+                throw ProxyTransportError.serverError(status: status, bytesSent: sent)
+            }
+            let decoded = try Self.decode(data)
+            guard !decoded.transcript.isEmpty else {
+                throw ProxyTransportError.emptyTranscript(bytesSent: sent)
+            }
+            return decoded
+        } catch let error as ProxyTransportError {
+            throw error
+        } catch let error as URLError where error.code == .timedOut {
+            throw ProxyTransportError.timeout(bytesSent: Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore))
+        } catch let error as URLError where error.code == .cancelled {
+            throw ProxyTransportError.cancelled(bytesSent: Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore))
+        } catch is CancellationError {
+            throw ProxyTransportError.cancelled(bytesSent: Int(redirectDelegate?.bytesSent.withLock { $0 } ?? sentBefore))
+        }
     }
 
     public func cancelAll() async {
-        lock.lock()
-        task?.cancel()
-        lock.unlock()
+        // URLSessionTask is not Sendable, so the scoped critical section uses the unchecked variant.
+        lock.withLockUnchecked { self.task?.cancel() }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             session.getAllTasks { tasks in
                 tasks.forEach { $0.cancel() }

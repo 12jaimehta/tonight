@@ -1,0 +1,35 @@
+{
+ "case": "G13_delta_exactly_5pp_FA_tie",
+ "why": "Both pass; uniform delta exactly +5pp; CI [1/20,1/20]; FA equal (tie not worse) -> SARVAM.",
+ "outcome": "SARVAM",
+ "warnings": [],
+ "apple": {
+  "agreement": "91/100",
+  "false_accept_rate": "1/20",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "24/25",
+  "false_accept_rate": "1/20",
+  "false_reject_rate": "3/80",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "1/20",
+ "ci": {
+  "low": "1/20",
+  "high": "1/20"
+ }
+}

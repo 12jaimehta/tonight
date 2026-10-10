@@ -1,4 +1,5 @@
 import AuthKit
+import CaptureKit
 import PracticeKit
 import ProfilesKit
 import SwiftData
@@ -73,6 +74,80 @@ final class PersistenceTests: XCTestCase {
         XCTAssertNil(object?["level"])
     }
 
+    func test_N8_storedStarsOutsideOneToThreeDoNotCrash() {
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(nil))
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(0))
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(4))
+        XCTAssertNil(TonightSchemaV1.StoredStarValue.validated(-1))
+        XCTAssertEqual(TonightSchemaV1.StoredStarValue.validated(1), 1)
+        XCTAssertEqual(TonightSchemaV1.StoredStarValue.validated(2), 2)
+        XCTAssertEqual(TonightSchemaV1.StoredStarValue.validated(3), 3)
+
+        let attempt = UUID()
+        let when = Date(timeIntervalSince1970: 1_700_000_000)
+        for stars in [0, 4, -8, 9] {
+            let row = TonightSchemaV1.StoredParentCheck(id: UUID(), attemptID: attempt, stars: stars, checkedAt: when)
+            XCTAssertNil(row.check(), "stored \(stars) must not crash")
+        }
+        for stars in 1...3 {
+            let row = TonightSchemaV1.StoredParentCheck(id: UUID(), attemptID: attempt, stars: stars, checkedAt: when)
+            XCTAssertEqual(row.check()?.stars, stars)
+        }
+    }
+
+    func test_PRIV18_PRIV20_DEL12_storeDirectoryIsExcludedBeforeOpen() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = directory.appendingPathComponent("Tonight.store")
+        _ = try TonightStore.makeContainer(at: storeURL)
+        XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(directory))
+        let attributes = try FileManager.default.attributesOfItem(atPath: directory.path)
+        let protection = attributes[.protectionKey] as? FileProtectionType
+        if ProcessInfo.processInfo.environment["SIMULATOR_UDID"] != nil {
+            XCTAssertTrue(protection == nil || protection == .completeUnlessOpen)
+        } else {
+            XCTAssertEqual(protection, .completeUnlessOpen)
+        }
+    }
+
+    func test_DEL19_withdrawalDeletesSwiftDataRememberWordsAndMarks() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let container = try TonightStore.makeContainer(at: directory.appendingPathComponent("Tonight.store"))
+        let context = ModelContext(container)
+        let child = UUID()
+        let other = UUID()
+        let task = try HomeworkTask.make(
+            childID: child,
+            subjectID: "english",
+            schoolClass: "2",
+            instruction: "Read",
+            checkMode: .parent,
+            pagePhotoRefs: [PhotoRef(relativePath: "pages/n.jpg")],
+            stars: 3
+        ).get()
+        context.insert(TonightSchemaV1.StoredHomework(task: task))
+        let attempt = NotebookAttempt(taskID: task.id, workPhotoRef: PhotoRef(relativePath: "pages/n.jpg"))
+        context.insert(TonightSchemaV1.StoredNotebook(attempt: attempt))
+        let check = try XCTUnwrap(ParentCheck(attemptID: attempt.id, stars: 2))
+        context.insert(TonightSchemaV1.StoredParentCheck(check: check))
+        context.insert(TonightSchemaV1.StoredRemember(entry: RememberEntry(
+            id: UUID(), childID: child, word: "ship", subjectID: "english", createdAt: Date()
+        )))
+        context.insert(TonightSchemaV1.StoredRemember(entry: RememberEntry(
+            id: UUID(), childID: other, word: "kept", subjectID: "english", createdAt: Date()
+        )))
+        try context.save()
+
+        try ChildWithdrawalErase.erase(childID: child, in: context)
+
+        let words = try context.fetch(FetchDescriptor<TonightSchemaV1.StoredRemember>())
+        XCTAssertEqual(words.map(\.word), ["kept"])
+        let homework = try context.fetch(FetchDescriptor<TonightSchemaV1.StoredHomework>())
+        XCTAssertNil(homework.first { $0.childID == child }?.stars)
+        let checks = try context.fetch(FetchDescriptor<TonightSchemaV1.StoredParentCheck>())
+        XCTAssertTrue(checks.isEmpty)
+    }
+
     func testPhotosAreExcludedFromBackupAndNeedTheParent() throws {
         XCTAssertEqual(LocalProtection.fileProtection, .complete)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -80,12 +155,38 @@ final class PersistenceTests: XCTestCase {
         let bytes = Data([9, 8, 7])
         try PhotoFilePolicy.write(bytes, to: url)
         XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(url))
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(attributes[.protectionKey] as? FileProtectionType, .complete)
+        try assertCompleteProtection(url)
 
         XCTAssertThrowsError(try PhotoAccess(parentUnlocked: false).contents(of: url)) { error in
             XCTAssertEqual(error as? PhotoAccessError, .parentLocked)
         }
         XCTAssertEqual(try PhotoAccess(parentUnlocked: true).contents(of: url), bytes)
+    }
+
+    func testJPEGBytesAreReadableOnlyWhenTheParentIsUnlocked() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("pages/page.jpg")
+        try PhotoFilePolicy.write(PageJPEG.bytes, to: url)
+        XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(url))
+        try assertCompleteProtection(url)
+
+        XCTAssertThrowsError(try PhotoAccess(parentUnlocked: false).contents(of: url)) { error in
+            XCTAssertEqual(error as? PhotoAccessError, .parentLocked)
+        }
+        let unlocked = try PhotoAccess(parentUnlocked: true).contents(of: url)
+        XCTAssertTrue(PageJPEG.isJPEG(unlocked))
+        XCTAssertEqual(Array(unlocked.prefix(2)), [0xFF, 0xD8])
+    }
+}
+
+/// The iOS Simulator accepts the complete-protection attribute and then omits it.
+/// A device must report it. A simulator that reports a different class still fails.
+private func assertCompleteProtection(_ url: URL, file: StaticString = #filePath, line: UInt = #line) throws {
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    let protection = attributes[.protectionKey] as? FileProtectionType
+    if ProcessInfo.processInfo.environment["SIMULATOR_UDID"] != nil {
+        XCTAssertTrue(protection == nil || protection == .complete, file: file, line: line)
+    } else {
+        XCTAssertEqual(protection, .complete, file: file, line: line)
     }
 }

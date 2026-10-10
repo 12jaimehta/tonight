@@ -1,4 +1,5 @@
 import Foundation
+import MarkingKit
 
 /// A missed word kept for practice. Two different correct days clear it.
 public struct RememberEntry: Codable, Hashable, Sendable, Identifiable {
@@ -76,10 +77,17 @@ public struct RememberList: Codable, Equatable, Sendable {
         return entry
     }
 
-    /// One correct day is recorded. A second, different day clears the word.
+    /// One correct spoken day is recorded. A second, different day clears the word.
+    /// A typed reading is not a correct read, so it does not move auto-clear. `add` can still save a word by hand.
     @discardableResult
-    public mutating func recordCorrect(id: UUID, day: String, at date: Date) -> RememberEntry? {
+    public mutating func recordCorrect(
+        id: UUID,
+        day: String,
+        at date: Date,
+        inputMode: InputMode = .spoken
+    ) -> RememberEntry? {
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return nil }
+        guard inputMode == .spoken else { return entries[index] }
         guard !entries[index].isCleared else { return entries[index] }
         if !entries[index].correctDays.contains(day) {
             entries[index].correctDays.append(day)
@@ -88,6 +96,11 @@ public struct RememberList: Codable, Equatable, Sendable {
             entries[index].clearedAt = date
         }
         return entries[index]
+    }
+
+    /// Withdrawal removes every Remember word for this child, cleared or not.
+    public mutating func removeAll(childID: UUID) {
+        entries.removeAll { $0.childID == childID }
     }
 
     public func active(childID: UUID? = nil) -> [RememberEntry] {

@@ -1,0 +1,34 @@
+{
+ "case": "G15_CI_low_exactly_0",
+ "why": "Two equal-size children: +12pp and 0pp; pooled +6pp, FA tie; 25% of draws pick the 0pp child twice, so CI low = 0 exactly (touches 0) -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "47/50",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/15",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "1",
+  "false_accept_rate": "0",
+  "false_reject_rate": "0",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "3/50",
+ "ci": {
+  "low": "0"
+ }
+}

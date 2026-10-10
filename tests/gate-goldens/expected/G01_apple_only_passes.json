@@ -1,0 +1,35 @@
+{
+ "case": "G01_apple_only_passes",
+ "why": "Apple passes all bars; Sarvam agreement 0.85 -> APPLE (no tie-break).",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "19/20",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/19",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "17/20",
+  "false_accept_rate": "0",
+  "false_reject_rate": "3/19",
+  "bars": {
+   "agreement_at_least_90": false,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": false
+  },
+  "passes": false
+ },
+ "delta": "-1/10",
+ "ci": {
+  "low": "-1/10",
+  "high": "-1/10"
+ }
+}

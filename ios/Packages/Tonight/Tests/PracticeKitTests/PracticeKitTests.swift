@@ -1,3 +1,4 @@
+import MarkingKit
 import XCTest
 @testable import PracticeKit
 
@@ -25,6 +26,14 @@ final class PracticeKitTests: XCTestCase {
         XCTAssertTrue(list.warmup().isEmpty)
     }
 
+    func test_DEL19_removeAllDropsThatChildsWords() {
+        var list = RememberList()
+        list.add(childID: child, word: "cat", subjectID: "english", at: day(0), id: UUID())
+        list.add(childID: UUID(), word: "kept", subjectID: "english", at: day(0), id: UUID())
+        list.removeAll(childID: child)
+        XCTAssertEqual(list.active().map(\.word), ["kept"])
+    }
+
     func testWarmupCapIsFiveOldest() {
         var list = RememberList()
         for index in 0..<6 {
@@ -49,6 +58,31 @@ final class PracticeKitTests: XCTestCase {
         XCTAssertEqual(first?.id, second?.id)
         XCTAssertEqual(list.active().count, 1)
         XCTAssertEqual(list.active().first?.word, "cat")
+    }
+
+    func testTypedReadDoesNotAutoClearAndManualSaveStillWorks() {
+        var list = RememberList()
+        let added = list.add(childID: child, word: "cat", subjectID: "english", at: day(0), id: UUID())
+        let id = try! XCTUnwrap(added).id
+
+        let typedOnce = list.recordCorrect(id: id, day: "2026-10-01", at: day(1), inputMode: .typed)
+        XCTAssertEqual(typedOnce?.correctDays, [])
+        XCTAssertNil(typedOnce?.clearedAt)
+        let typedAgain = list.recordCorrect(id: id, day: "2026-10-02", at: day(2), inputMode: .typed)
+        XCTAssertEqual(typedAgain?.correctDays, [])
+        XCTAssertNil(typedAgain?.clearedAt)
+        XCTAssertEqual(list.active().count, 1)
+
+        let manual = list.add(childID: child, word: "kite", subjectID: "english", at: day(3))
+        XCTAssertEqual(manual?.word, "kite")
+        XCTAssertNil(manual?.clearedAt)
+
+        let spokenOnce = list.recordCorrect(id: id, day: "2026-10-03", at: day(3), inputMode: .spoken)
+        XCTAssertEqual(spokenOnce?.correctDays, ["2026-10-03"])
+        XCTAssertNil(spokenOnce?.clearedAt)
+        let cleared = list.recordCorrect(id: id, day: "2026-10-04", at: day(4), inputMode: .spoken)
+        XCTAssertNotNil(cleared?.clearedAt)
+        XCTAssertEqual(list.active().map(\.word), ["kite"])
     }
 
     func testDayKeyUsesUTC() {

@@ -1,0 +1,8 @@
+{
+ "case": "G27_age_missing",
+ "why": "Age key absent -> OUT_OF_COHORT.",
+ "outcome": "OUT_OF_COHORT",
+ "children": [
+  "c00"
+ ]
+}

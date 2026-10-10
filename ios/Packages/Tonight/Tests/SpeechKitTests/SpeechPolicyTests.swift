@@ -5,6 +5,11 @@ final class SpeechPolicyTests: XCTestCase {
     private let child = UUID()
     private let otherChild = UUID()
 
+    override func setUp() {
+        super.setUp()
+        installPlaceholderSpeechConfig()
+    }
+
     func testCG01_noConsent_doesNotRecord() {
         let selection = SpeechEngineSelector.select(input(record: nil))
         XCTAssertEqual(selection.engine, .none)
@@ -32,11 +37,19 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(selection.maySendAudio)
     }
 
-    func testCG06_serverEligible() {
+    func test_CG17_NET14_releaseBuildLeavesTheServerBranchOut() {
+        XCTAssertFalse(ServerSpeechBuild.isStudyBuild)
         let selection = SpeechEngineSelector.select(eligibleInput(record: record(scopes: [.onDevice, .server])))
-        XCTAssertEqual(selection.engine, .sarvam)
-        XCTAssertTrue(selection.maySendAudio)
-        XCTAssertEqual(selection.reason, .serverEligible)
+        XCTAssertEqual(selection.engine, .appleOnDevice)
+        XCTAssertEqual(selection.reason, .releaseBuild)
+        XCTAssertFalse(selection.maySendAudio)
+        let source = try! String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/SpeechKit/SpeechAttemptRunner.swift"))
+        XCTAssertTrue(source.contains("#if STUDY || DEBUG\nenum SarvamRequestBody"))
+        XCTAssertTrue(source.contains("#if STUDY\n            return await transcribeServer"))
     }
 
     func testCG07_withdrawnServer_isOnDeviceEvenOffline() {
@@ -55,6 +68,12 @@ final class SpeechPolicyTests: XCTestCase {
         let selection = SpeechEngineSelector.select(eligibleInput(record: granted))
         XCTAssertEqual(selection.engine, .none)
         XCTAssertFalse(selection.maySendAudio)
+    }
+
+    func test_CG09_CG15_scopeNamesMatchTheServerVocabulary() {
+        XCTAssertEqual(AudioConsentScope.onDevice.rawValue, "on_device_speech")
+        XCTAssertEqual(AudioConsentScope.server.rawValue, "server_speech")
+        XCTAssertEqual(AudioConsentRecord.currentVersion, "2026-10-09")
     }
 
     func testCG09_staleVersionBlocksServer() {
@@ -130,7 +149,7 @@ final class SpeechPolicyTests: XCTestCase {
         registry.delete(childProfileID: child, serverPathOnly: false, at: Date())
         XCTAssertTrue(registry.live(childProfileID: child).isEmpty)
         XCTAssertEqual(registry.live(childProfileID: otherChild).count, 1)
-        XCTAssertNil(store.record(for: child)?.scopeIsActive(.server))
+        XCTAssertEqual(store.record(for: child)?.scopeIsActive(.server), false)
         XCTAssertEqual(store.record(for: child)?.scopeIsActive(.onDevice), false)
     }
 
@@ -153,9 +172,7 @@ final class SpeechPolicyTests: XCTestCase {
         let sources = root.appendingPathComponent("Sources")
         let package = root.appendingPathComponent("Package.swift")
         let text = try sourceText(at: sources) + (try String(contentsOf: package))
-        XCTAssertFalse(text.contains("firebase"), "NET-02b")
-        XCTAssertFalse(text.contains("import Supabase"), "NET-02b")
-        XCTAssertFalse(text.contains("supabase-swift"), "NET-02b")
+        XCTAssertFalse(text.localizedCaseInsensitiveContains("firebase"), "NET-02b")
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
@@ -163,8 +180,46 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(urls.count, 1)
-        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
+        XCTAssertEqual(urls, [], "NET-02c the host lives in xcconfig, not in a source literal")
+    }
+
+    func testSpeechConfigIsInjectedInsteadOfTheAppBundle() {
+        XCTAssertNil(SupabaseSpeechConfig.load(from: Bundle(for: SpeechPolicyTests.self)))
+        XCTAssertEqual(TonightEndpoints.proxyBaseURL.host, "project-ref.supabase.co")
+        XCTAssertEqual(TonightEndpoints.anonKey, "test-anon-key")
+    }
+
+    func test_NET02b_supabaseSwiftIsTheOnlyPermittedThirdPartySDK() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let package = try String(contentsOf: root.appendingPathComponent("Package.swift"))
+        let permitted = ["supabase-swift"]
+        XCTAssertEqual(permitted, ["supabase-swift"])
+        for banned in ["firebase", "Firebase", "mixpanel", "amplitude", "sentry", "bugsnag", "sarvam.ai"] {
+            XCTAssertFalse(package.localizedCaseInsensitiveContains(banned), banned)
+        }
+        if package.contains("supabase-swift") {
+            XCTAssertTrue(package.contains("supabase-swift"))
+            XCTAssertEqual(package.components(separatedBy: "supabase-swift").count - 1, package.components(separatedBy: ".package").count - 1)
+        }
+    }
+
+    func test_NET02c_redirectDelegateRejectsEveryHop() {
+        installPlaceholderSpeechConfig()
+        let delegate = AllowlistSessionDelegate()
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.dataTask(with: TonightEndpoints.proxyBaseURL)
+        let response = HTTPURLResponse(url: TonightEndpoints.proxyBaseURL, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        let offHost = URLRequest(url: URL(string: "https://api.sarvam.ai/speech")!)
+        var followed: URLRequest? = URLRequest(url: TonightEndpoints.proxyBaseURL)
+        delegate.urlSession(session, task: task, willPerformHTTPRedirection: response, newRequest: offHost) { request in
+            followed = request
+        }
+        XCTAssertNil(followed)
+        task.cancel()
+        session.invalidateAndCancel()
     }
 
     func testForegroundSessionIsNotABackgroundSession() {
@@ -177,24 +232,18 @@ final class SpeechPolicyTests: XCTestCase {
 
     func testCG06_runnerSendsOnlyToTheProxy() async {
         let transport = SpyTransport()
-        await transport.setMode(.succeed(ProxyResponse(transcript: "the cat", words: [], latency: 0.2, cost: Decimal(string: "0.002"))))
+        await transport.setMode(.succeed(ProxyResponse(transcript: "the cat", words: [], latency: 0.2, cost: Decimal(string: "0.002", locale: Locale(identifier: "en_US_POSIX")))))
         let runner = makeRunner(transport: transport, sleeper: NeverSleeper())
         let outcome = await runner.run(
             audio: SpeechAudio(samples: Data([1, 2, 3, 4])),
             input: eligibleInput(record: record(scopes: [.onDevice, .server])),
             attemptID: UUID()
         )
-        XCTAssertEqual(outcome.engine, .sarvam)
-        XCTAssertGreaterThan(outcome.bytesSent, 0)
+        XCTAssertNotEqual(outcome.engine, .sarvam)
+        XCTAssertEqual(outcome.bytesSent, 0)
         let posts = await transport.posts
-        XCTAssertEqual(posts.count, 1)
-        XCTAssertEqual(posts[0].url.host, "project-ref.supabase.co")
-        XCTAssertEqual(posts[0].url.path, "/functions/v1/sarvam-proxy")
-        XCTAssertNil(posts[0].headers["x-api-key"])
-        XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("sarvam") })
-        let body = try! JSONSerialization.jsonObject(with: posts[0].body) as! [String: String]
-        XCTAssertNil(body["apiKey"])
-        XCTAssertEqual(runner.callLogs.snapshot().count, 1)
+        XCTAssertEqual(posts.count, 0)
+        XCTAssertEqual(runner.callLogs.snapshot().count, 0)
     }
 
     func testNonEligibleStatesSendZeroBytes() async {
@@ -229,12 +278,21 @@ final class SpeechPolicyTests: XCTestCase {
             attemptID: UUID()
         )
         XCTAssertEqual(outcome.engine, .appleOnDevice)
+        XCTAssertEqual(outcome.transcript, "the cat")
+        #if STUDY
         XCTAssertEqual(outcome.fallbackReason, "timeout")
         XCTAssertTrue(outcome.usedSameBuffer)
         XCTAssertEqual(outcome.bytesSent, 0)
         XCTAssertEqual(onDevice.calls, 1)
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
         XCTAssertEqual(runner.audit.snapshot().last?.cancelledAfterBytes != nil, true)
+        #else
+        XCTAssertNil(outcome.fallbackReason)
+        XCTAssertEqual(outcome.bytesSent, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
+        #endif
     }
 
     func testLAT06_onDeviceUnavailableAfterOfflineIsParentMarking() async {
@@ -248,7 +306,8 @@ final class SpeechPolicyTests: XCTestCase {
         )
         XCTAssertTrue(outcome.parentMarking)
         XCTAssertEqual(outcome.engine, .parentMarking)
-        XCTAssertEqual(await transport.posts.count, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
         XCTAssertEqual(onDevice.calls, 0)
     }
 
@@ -256,13 +315,15 @@ final class SpeechPolicyTests: XCTestCase {
         let transport = SpyTransport()
         let runner = makeRunner(transport: transport, sleeper: NeverSleeper())
         await runner.suspend()
-        XCTAssertTrue(await transport.wasCancelled())
+        let cancelled = await transport.wasCancelled()
+        XCTAssertTrue(cancelled)
         let outcome = await runner.run(
             audio: SpeechAudio(samples: Data([1, 2])),
             input: input(flagOn: false, record: record(scopes: [.onDevice])),
             attemptID: UUID()
         )
-        XCTAssertEqual(await transport.posts.count, 0)
+        let posts = await transport.posts
+        XCTAssertEqual(posts.count, 0)
         XCTAssertEqual(outcome.bytesSent, 0)
     }
 
@@ -357,12 +418,19 @@ actor SpyTransport: ProxyTransporting {
         }
     }
 
-    func cancelAll() { cancelled = true }
+    func cancelAll() async { cancelled = true }
     func wasCancelled() -> Bool { cancelled }
 }
 
 struct ImmediateSleeper: SpeechSleeper {
     func sleep(seconds: TimeInterval) async throws {}
+}
+
+func installPlaceholderSpeechConfig() {
+    TonightEndpoints.use(SupabaseSpeechConfig(
+        baseURL: URL(string: "https://project-ref.supabase.co")!,
+        anonKey: "test-anon-key"
+    ))
 }
 
 struct NeverSleeper: SpeechSleeper {

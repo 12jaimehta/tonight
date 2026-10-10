@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "children": [
+    {
+      "child_id": "c1",
+      "age": 7,
+      "school_class": 2,
+      "recordings": [
+        {
+          "recording_id": "c1-passage",
+          "words": [
+            {"reference_correct": true, "sarvam_correct": true},
+            {"reference_correct": false, "apple_correct": null, "sarvam_correct": false},
+            {"reference_correct": true, "apple_correct": false}
+          ]
+        }
+      ]
+    }
+  ]
+}

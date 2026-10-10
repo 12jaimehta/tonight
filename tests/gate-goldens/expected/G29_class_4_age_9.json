@@ -1,0 +1,9 @@
+{
+ "case": "G29_class_4_age_9",
+ "why": "Class 4 and a separate age 9 -> OUT_OF_COHORT naming both.",
+ "outcome": "OUT_OF_COHORT",
+ "children": [
+  "c00",
+  "c01"
+ ]
+}
