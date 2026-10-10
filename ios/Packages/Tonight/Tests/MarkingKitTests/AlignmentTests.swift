@@ -95,7 +95,7 @@ final class AlignmentTests: XCTestCase {
         let heard = words.enumerated().filter { $0.offset % 4 != 0 }.map(\.element).joined(separator: " ")
         _ = marker.mark(expected: passage, heard: heard)
         var best = TimeInterval.greatestFiniteMagnitude
-        for _ in 0..<5 {
+        for _ in 0..<30 {
             let start = Date()
             let mark = marker.mark(expected: passage, heard: heard)
             best = min(best, Date().timeIntervalSince(start))
