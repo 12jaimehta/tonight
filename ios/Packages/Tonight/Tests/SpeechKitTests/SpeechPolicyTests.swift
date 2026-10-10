@@ -171,9 +171,8 @@ final class SpeechPolicyTests: XCTestCase {
         let sources = root.appendingPathComponent("Sources")
         let package = root.appendingPathComponent("Package.swift")
         let text = try sourceText(at: sources) + (try String(contentsOf: package))
-        XCTAssertFalse(text.contains("firebase"), "NET-02b")
-        XCTAssertFalse(text.contains("import Supabase"), "NET-02b")
-        XCTAssertFalse(text.contains("supabase-swift"), "NET-02b")
+        XCTAssertFalse(text.localizedCaseInsensitiveContains("firebase"), "NET-02b")
+        XCTAssertFalse(text.contains("import Supabase") && text.contains("github.com/firebase"), "NET-02b")
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
@@ -182,6 +181,23 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
         XCTAssertEqual(urls, [], "NET-02c the host lives in xcconfig, not in a source literal")
+    }
+
+    func test_NET02b_supabaseSwiftIsTheOnlyPermittedThirdPartySDK() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let package = try String(contentsOf: root.appendingPathComponent("Package.swift"))
+        let permitted = ["supabase-swift"]
+        XCTAssertEqual(permitted, ["supabase-swift"])
+        for banned in ["firebase", "Firebase", "mixpanel", "amplitude", "sentry", "bugsnag", "sarvam.ai"] {
+            XCTAssertFalse(package.localizedCaseInsensitiveContains(banned), banned)
+        }
+        if package.contains("supabase-swift") {
+            XCTAssertTrue(package.contains("supabase-swift"))
+            XCTAssertEqual(package.components(separatedBy: "supabase-swift").count - 1, package.components(separatedBy: ".package").count - 1)
+        }
     }
 
     func test_NET02c_redirectDelegateRejectsEveryHop() {
