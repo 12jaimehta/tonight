@@ -251,7 +251,7 @@ final class SpeechLedgerTests: XCTestCase {
         XCTAssertFalse(request.value(forHTTPHeaderField: "Authorization") == "Bearer ")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
         let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: String]
-        XCTAssertEqual(Set(body?.keys ?? []), Set(required))
+        XCTAssertEqual(Set((body ?? [:]).keys), Set(required))
         XCTAssertTrue(allowed.contains(body?["mode"] ?? ""))
         XCTAssertEqual(body?["mode"], HostDeletionSender.dueMode)
 

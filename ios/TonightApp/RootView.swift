@@ -1,3 +1,4 @@
+import AuthKit
 import DesignSystem
 import SpeechKit
 import SwiftUI
