@@ -1,0 +1,6 @@
+{
+ "case": "G32_unpaired_whole_recording",
+ "why": "A recording with no Sarvam results -> UNPAIRED_RECORDING (MET-28).",
+ "outcome": "UNPAIRED_RECORDING",
+ "recording": "c00-r0"
+}

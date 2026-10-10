@@ -1,0 +1,35 @@
+{
+ "case": "G14_delta_49_of_1000",
+ "why": "Both pass; uniform delta 49/1000 < 5pp -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "181/200",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "477/500",
+  "false_accept_rate": "0",
+  "false_reject_rate": "23/475",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "49/1000",
+ "ci": {
+  "low": "49/1000",
+  "high": "49/1000"
+ }
+}

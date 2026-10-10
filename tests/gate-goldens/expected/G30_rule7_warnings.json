@@ -1,0 +1,38 @@
+{
+ "case": "G30_rule7_warnings",
+ "why": "Class 1 age 8 and class 3 age 6 warn; still scored -> APPLE with exactly those two warnings.",
+ "outcome": "APPLE",
+ "warnings": [
+  "w1",
+  "w2"
+ ],
+ "apple": {
+  "agreement": "99/100",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/95",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "99/100",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/95",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

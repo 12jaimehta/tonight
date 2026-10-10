@@ -1,0 +1,35 @@
+{
+ "case": "G17_FA_worse_by_one_word",
+ "why": "Both pass; uniform +6pp, CI > 0; Sarvam FA 1/20 vs Apple 0 (one accepted misread per child) -> APPLE (MET-34).",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "23/25",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "49/50",
+  "false_accept_rate": "1/20",
+  "false_reject_rate": "1/80",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "3/50",
+ "ci": {
+  "low": "3/50",
+  "high": "3/50"
+ }
+}

@@ -1,0 +1,6 @@
+{
+ "case": "G25_invalid_no_correct_reference",
+ "why": "No ref-correct word anywhere -> INVALID_STUDY (pooled FR denominator 0).",
+ "outcome": "INVALID_STUDY",
+ "denominator": "false_reject"
+}

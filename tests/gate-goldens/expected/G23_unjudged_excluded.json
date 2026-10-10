@@ -1,0 +1,35 @@
+{
+ "case": "G23_unjudged_excluded",
+ "why": "10 unjudged words per child are excluded: agreement 909/990 (not 909/1090) -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "101/110",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/11",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "101/110",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/11",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

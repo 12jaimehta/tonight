@@ -1,0 +1,6 @@
+{
+ "case": "G33_unpaired_some_words",
+ "why": "A recording where 3 words have no Sarvam result -> UNPAIRED_RECORDING (M0 \u00a75.3: never drop silently).",
+ "outcome": "UNPAIRED_RECORDING",
+ "recording": "c00-r0"
+}

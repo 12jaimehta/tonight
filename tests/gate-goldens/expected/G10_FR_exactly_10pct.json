@@ -1,0 +1,35 @@
+{
+ "case": "G10_FR_exactly_10pct",
+ "why": "Pooled FR exactly 1/10 passes; no FA -> APPLE (agreement 0.905).",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "181/200",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "181/200",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

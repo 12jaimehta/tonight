@@ -1,0 +1,8 @@
+{
+ "case": "G28_class_null",
+ "why": "school_class null -> OUT_OF_COHORT.",
+ "outcome": "OUT_OF_COHORT",
+ "children": [
+  "c00"
+ ]
+}

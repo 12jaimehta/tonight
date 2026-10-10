@@ -1,0 +1,35 @@
+{
+ "case": "G21_both_fail",
+ "why": "Both engines: agreement 19/22, FA 1/2 -> NO_GO (MET-36d).",
+ "outcome": "NO_GO",
+ "warnings": [],
+ "apple": {
+  "agreement": "19/22",
+  "false_accept_rate": "1/2",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": false,
+   "pooled_false_accept_at_most_5": false,
+   "per_child_false_accept_at_most_10": false,
+   "false_reject_at_most_10": true
+  },
+  "passes": false
+ },
+ "sarvam": {
+  "agreement": "19/22",
+  "false_accept_rate": "1/2",
+  "false_reject_rate": "1/10",
+  "bars": {
+   "agreement_at_least_90": false,
+   "pooled_false_accept_at_most_5": false,
+   "per_child_false_accept_at_most_10": false,
+   "false_reject_at_most_10": true
+  },
+  "passes": false
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

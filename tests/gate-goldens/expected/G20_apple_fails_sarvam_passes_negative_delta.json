@@ -1,0 +1,31 @@
+{
+ "case": "G20_apple_fails_sarvam_passes_negative_delta",
+ "why": "Apple higher agreement but fails the child cap; Sarvam passes with lower agreement -> SARVAM (MET-36c).",
+ "outcome": "SARVAM",
+ "warnings": [],
+ "apple": {
+  "agreement": "499/500",
+  "false_accept_rate": "1/50",
+  "false_reject_rate": "0",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": false,
+   "false_reject_at_most_10": true
+  },
+  "passes": false
+ },
+ "sarvam": {
+  "agreement": "973/1000",
+  "false_accept_rate": "0",
+  "false_reject_rate": "3/100",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "-1/40"
+}

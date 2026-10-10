@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Compare GateHarness decisions with the independent checker on shared fixtures.
+"""Compare GateHarness decisions with the pinned independent checker.
 
-Decision, seed, and interval bounds must match. Warning text is not compared:
-PM rule 7 warns only for class 1 with age 8 and class 3 with age 6, while the
-independent checker still warns on every in-range pair other than 6/1, 7/2, 8/3.
+Decision, seed, and interval bounds must match on the shared fixtures.
+QA goldens (tests/gate-goldens/compare.py) compare warnings by child id and
+fail the job. This script does not compare warning text.
 """
 
 from __future__ import annotations

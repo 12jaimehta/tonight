@@ -87,7 +87,7 @@ A tie on false-accept is not worse. An interval endpoint of exactly 0 stays `APP
 
 Error JSON is `{ "error": "OUT_OF_COHORT" | "INVALID_STUDY" | "UNPAIRED_RECORDING" | "INVALID_INPUT", "message": "..." }`.
 
-Large cohorts are built from cell counts in the test. A missing `*.golden.json` for the seeded names fails the run. Those goldens are not rewritten by the test.
+Large cohorts are built from cell counts in the test. The round-2 `*.golden.json` files are not expected results. QA goldens live in `tests/gate-goldens/`.
 
 | Fixture | Result |
 |---|---|

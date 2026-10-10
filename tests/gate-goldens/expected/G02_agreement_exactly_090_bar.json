@@ -1,0 +1,35 @@
+{
+ "case": "G02_agreement_exactly_090_bar",
+ "why": "Agreement exactly 9/10 (bar passes, inclusive) but FA 1/5 fails -> NO_GO. Full pass at exactly 0.90 is impossible with FA words (see README).",
+ "outcome": "NO_GO",
+ "warnings": [],
+ "apple": {
+  "agreement": "9/10",
+  "false_accept_rate": "1/5",
+  "false_reject_rate": "9/95",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": false,
+   "per_child_false_accept_at_most_10": false,
+   "false_reject_at_most_10": true
+  },
+  "passes": false
+ },
+ "sarvam": {
+  "agreement": "9/10",
+  "false_accept_rate": "1/5",
+  "false_reject_rate": "9/95",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": false,
+   "per_child_false_accept_at_most_10": false,
+   "false_reject_at_most_10": true
+  },
+  "passes": false
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

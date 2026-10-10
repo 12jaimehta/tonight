@@ -313,7 +313,7 @@ final class GateHarnessTests: XCTestCase {
             "unpaired", "out_of_cohort", "age_reject", "class_reject",
         ] {
             let url = Bundle.module.url(forResource: "\(name).golden", withExtension: "json", subdirectory: "Fixtures")
-            XCTAssertNotNil(url, "missing golden \(name) fails the run")
+            XCTAssertNil(url, "round-2 golden \(name) is not an expected result")
         }
     }
 

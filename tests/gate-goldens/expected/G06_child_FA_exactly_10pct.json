@@ -1,0 +1,35 @@
+{
+ "case": "G06_child_FA_exactly_10pct",
+ "why": "One child at FA 10/100 (cap boundary, passes); pooled FA 10/1000 -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "999/1000",
+  "false_accept_rate": "1/100",
+  "false_reject_rate": "0",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "999/1000",
+  "false_accept_rate": "1/100",
+  "false_reject_rate": "0",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}

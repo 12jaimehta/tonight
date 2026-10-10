@@ -1,13 +1,15 @@
 #!/bin/sh
-# Fetch PR #10 and compare its decision tokens with the Swift harness.
-# The checker tree is not committed. Warning text is ignored (PM rule 7).
+# Fetch the pinned PR #10 checker and compare it with the Swift harness.
+# QA goldens fail the job on any mismatch, including warnings.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
-git fetch origin gate-check-independent
-git checkout origin/gate-check-independent -- tools/gate_check_independent
+pin=$(tr -d '[:space:]' < ios/scripts/gate-check-independent.pin)
+echo "gate-check-independent pin $pin"
+git fetch --depth=1 origin "$pin"
+git checkout "$pin" -- tools/gate_check_independent
 
 cleanup() {
   git reset -q HEAD -- tools/gate_check_independent 2>/dev/null || true
@@ -34,3 +36,24 @@ swiftc -O \
   -o "$out"
 
 "$py" ios/scripts/cross_check_gate.py "$out" "$root/tools/gate_check_independent"
+
+export PYTHONPATH="$root/tools/gate_check_independent${PYTHONPATH:+:$PYTHONPATH}"
+fail=0
+for label_cmd in "swift|$out {}" "independent|$py -m gate_check_independent {} --format json"; do
+  label=${label_cmd%%|*}
+  rest=${label_cmd#*|}
+  # shellcheck disable=SC2086
+  log=${RUNNER_TEMP:-/tmp}/golden-$label.txt
+  # compare.py prints MISMATCH and still exits 0. The job fails on those lines,
+  # which include warning mismatches.
+  set +e
+  # shellcheck disable=SC2086
+  "$py" tests/gate-goldens/compare.py "$label" $rest > "$log"
+  set -e
+  cat "$log"
+  if grep -q '^MISMATCH ' "$log"; then
+    echo "$label goldens mismatched, including any warning differences"
+    fail=1
+  fi
+done
+exit "$fail"

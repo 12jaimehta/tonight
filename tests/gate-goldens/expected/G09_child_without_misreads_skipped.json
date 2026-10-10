@@ -1,0 +1,35 @@
+{
+ "case": "G09_child_without_misreads_skipped",
+ "why": "Child with 0 ref-incorrect words is skipped by the cap and adds 0/0 to pooled FA -> APPLE.",
+ "outcome": "APPLE",
+ "warnings": [],
+ "apple": {
+  "agreement": "119/120",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/115",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "sarvam": {
+  "agreement": "119/120",
+  "false_accept_rate": "0",
+  "false_reject_rate": "1/115",
+  "bars": {
+   "agreement_at_least_90": true,
+   "pooled_false_accept_at_most_5": true,
+   "per_child_false_accept_at_most_10": true,
+   "false_reject_at_most_10": true
+  },
+  "passes": true
+ },
+ "delta": "0",
+ "ci": {
+  "low": "0",
+  "high": "0"
+ }
+}
