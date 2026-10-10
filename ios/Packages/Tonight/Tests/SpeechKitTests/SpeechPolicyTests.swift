@@ -179,9 +179,10 @@ final class SpeechPolicyTests: XCTestCase {
         let transport = SpyTransport()
         await transport.setMode(.succeed(ProxyResponse(transcript: "the cat", words: [], latency: 0.2, cost: Decimal(string: "0.002", locale: Locale(identifier: "en_US_POSIX")))))
         let runner = makeRunner(transport: transport, sleeper: NeverSleeper())
+        let granted = record(scopes: [.onDevice, .server])
         let outcome = await runner.run(
             audio: SpeechAudio(samples: Data([1, 2, 3, 4])),
-            input: eligibleInput(record: record(scopes: [.onDevice, .server])),
+            input: eligibleInput(record: granted),
             attemptID: UUID()
         )
         XCTAssertEqual(outcome.engine, .sarvam)
@@ -193,6 +194,13 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertNil(posts[0].headers["x-api-key"])
         XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("sarvam") })
         let body = try! JSONSerialization.jsonObject(with: posts[0].body) as! [String: String]
+        XCTAssertEqual(body["child_profile_id"], granted.childProfileID.uuidString)
+        XCTAssertEqual(body["audio_base64"], Data([1, 2, 3, 4]).base64EncodedString())
+        XCTAssertEqual(body["locale"], OnDeviceRequestPolicy.localeIdentifier)
+        XCTAssertEqual(body["consent_record_id"], granted.id.uuidString)
+        XCTAssertEqual(body["consent_version"], granted.version)
+        XCTAssertNil(body["audioBase64"])
+        XCTAssertNil(body["consentRecordId"])
         XCTAssertNil(body["apiKey"])
         XCTAssertEqual(runner.callLogs.snapshot().count, 1)
     }

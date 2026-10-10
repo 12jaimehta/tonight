@@ -206,11 +206,11 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
 enum SarvamRequestBody {
     static func encode(audio: SpeechAudio, locale: String, consent: AudioConsentRecord) -> Data {
         let payload: [String: String] = [
+            "child_profile_id": consent.childProfileID.uuidString,
+            "audio_base64": audio.samples.base64EncodedString(),
             "locale": locale,
-            "audioBase64": audio.samples.base64EncodedString(),
-            "contentType": "audio/wav",
-            "consentRecordId": consent.id.uuidString,
-            "consentVersion": consent.version,
+            "consent_record_id": consent.id.uuidString,
+            "consent_version": consent.version,
         ]
         return try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
     }
