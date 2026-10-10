@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 OMIT = object()
+_CLASS_FOR_AGE = {6: 1, 7: 2, 8: 3}
 
 
-def cell(reference: bool, apple: bool, sarvam: bool, n: int) -> dict[str, Any]:
+def cell(reference: bool | None, apple: bool, sarvam: bool, n: int) -> dict[str, Any]:
     return {
         "reference_correct": reference,
         "apple_correct": apple,
@@ -35,6 +36,10 @@ def child(
     body: dict[str, Any] = {"child_id": child_id, "recordings": recordings or []}
     if age is not OMIT:
         body["age"] = age
+    if isinstance(age, int) and not isinstance(age, bool) and age in _CLASS_FOR_AGE:
+        body["school_class"] = _CLASS_FOR_AGE[age]
+    else:
+        body["school_class"] = 1
     body.update(extra)
     return body
 

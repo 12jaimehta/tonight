@@ -3,14 +3,16 @@
 An engine passes when, on the pooled word judgments:
 
 - agreement is at least 90%
-- pooled false-accept is at most 5% (no reference-incorrect words passes)
+- pooled false-accept is at most 5%
 - every child's false-accept is at most 10% (a child with no
   reference-incorrect words is skipped)
-- pooled false-reject is defined and at most 10%
+- pooled false-reject is at most 10% (there is no per-child false-reject cap)
 
-The false-reject bar is the M0 decisions paragraph. The shorter T-006 line
-names agreement and false-accept only; the later decision note adds
-false-reject and the per-child cap.
+A recording with no reference-correct words is left out of the false-reject
+count. A recording with no reference-incorrect words adds 0 to the
+false-accept numerator and denominator. A child with no reference-incorrect
+words is skipped for the per-child cap. A pooled denominator of 0 is
+``INVALID_STUDY`` and never passes.
 
 Decision order:
 
@@ -20,8 +22,9 @@ Decision order:
 4. Neither passes: NO_GO.
 
 Sarvam clearly beats Apple when its pooled agreement is at least 5 percentage
-points higher, the paired bootstrap interval sits strictly above zero, and its
-pooled false-accept rate is less than or equal to Apple's.
+points higher, the child-cluster bootstrap interval sits strictly above zero,
+and its pooled false-accept rate is less than or equal to Apple's. A tie on
+false-accept is not worse.
 """
 
 from __future__ import annotations
@@ -122,6 +125,7 @@ class GateDecision:
     agreement_delta: Fraction
     interval: AgreementInterval
     beats: BeatBreakdown
+    warnings: tuple[str, ...]
 
 
 def evaluate(
@@ -135,11 +139,12 @@ def evaluate(
 
     _validate_settings(seed, resamples, confidence)
     cohort = parse_cohort(payload)
+    _require_defined_denominators(cohort)
     apple = score_engine(cohort, "apple")
     sarvam = score_engine(cohort, "sarvam")
     delta = pooled_agreement_delta(cohort.recordings)
     interval = agreement_interval(
-        cohort.recordings,
+        cohort.children,
         resamples=resamples,
         seed=seed,
         confidence=confidence,
@@ -159,6 +164,7 @@ def evaluate(
         agreement_delta=delta,
         interval=interval,
         beats=breakdown,
+        warnings=cohort.warnings,
     )
 
 
@@ -216,7 +222,7 @@ def score_engine(cohort: Cohort, engine: EngineName) -> EngineScore:
     agreement = Fraction(matches, words)
     if reference_incorrect == 0:
         false_accept_rate = None
-        false_accept_ok = True
+        false_accept_ok = False
     else:
         false_accept_rate = Fraction(false_accepts, reference_incorrect)
         false_accept_ok = false_accept_rate <= POOLED_FALSE_ACCEPT_MAXIMUM
@@ -250,6 +256,8 @@ def decision_to_dict(result: GateDecision) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "decision": result.decision,
+        "seed": result.interval.seed,
+        "warnings": list(result.warnings),
         "agreement_delta": _ratio(result.agreement_delta),
         "apple": _engine_dict(result.apple),
         "sarvam": _engine_dict(result.sarvam),
@@ -261,7 +269,7 @@ def decision_to_dict(result: GateDecision) -> dict[str, Any]:
             "false_accept_not_worse": result.beats.false_accept_not_worse,
         },
         "interval": {
-            "method": "paired recording bootstrap, Hyndman-Fan type 7 percentile",
+            "method": "paired child-cluster bootstrap, Hyndman-Fan type 7 percentile",
             "generator": "random.Random",
             "confidence": _ratio(result.interval.confidence),
             "resamples": result.interval.resamples,
@@ -334,6 +342,23 @@ def _false_rejects(recording: RecordingTotals, engine: EngineName) -> int:
     if engine == "sarvam":
         return recording.sarvam_false_rejects
     raise GateCheckError("INVALID_INPUT", f"unknown engine {engine!r}")
+
+
+def _require_defined_denominators(cohort: Cohort) -> None:
+    """A pooled denominator of 0 makes the study invalid. It never passes."""
+
+    reference_correct = 0
+    reference_incorrect = 0
+    for recording in cohort.recordings:
+        reference_correct += recording.reference_correct
+        reference_incorrect += recording.reference_incorrect
+    problems: list[str] = []
+    if reference_correct == 0:
+        problems.append("pooled false-reject denominator is 0")
+    if reference_incorrect == 0:
+        problems.append("pooled false-accept denominator is 0")
+    if problems:
+        raise GateCheckError("INVALID_STUDY", "; ".join(problems))
 
 
 def _validate_settings(seed: int, resamples: int, confidence: Fraction) -> None:

@@ -17,7 +17,6 @@ EXAMPLES = ROOT / "examples"
 @pytest.mark.parametrize(
     ("name", "expected"),
     [
-        ("exactly_090.json", "APPLE"),
         ("exactly_5_percent_false_accept.json", "APPLE"),
         ("exactly_5pp.json", "SARVAM"),
         ("sarvam_only.json", "SARVAM"),
@@ -28,7 +27,16 @@ def test_examples_print_the_decision(name: str, expected: str, capsys: pytest.Ca
     assert main([str(EXAMPLES / name)]) == 0
     captured = capsys.readouterr()
     assert captured.out == f"{expected}\n"
-    assert captured.err == ""
+    assert captured.err == f"seed={DEFAULT_SEED}\n"
+
+
+def test_exactly_090_is_invalid_because_false_accept_denominator_is_zero(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main([str(EXAMPLES / "exactly_090.json")]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == "INVALID_STUDY\n"
+    assert "false-accept" in captured.err
 
 
 def test_missing_age_example_exits_out_of_cohort(capsys: pytest.CaptureFixture[str]) -> None:
@@ -38,20 +46,27 @@ def test_missing_age_example_exits_out_of_cohort(capsys: pytest.CaptureFixture[s
     assert "c2" in captured.err
 
 
-def test_json_report_uses_exact_ratios(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main([str(EXAMPLES / "exactly_090.json"), "--format", "json"]) == 0
+def test_json_report_uses_exact_ratios_and_logs_the_seed(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main([str(EXAMPLES / "exactly_5_percent_false_accept.json"), "--format", "json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["decision"] == "APPLE"
-    assert report["apple"]["agreement"] == {"numerator": 9, "denominator": 10}
-    assert report["apple"]["false_reject_rate"] == {
+    assert report["seed"] == DEFAULT_SEED
+    assert report["warnings"] == []
+    assert report["apple"]["agreement"] == {"numerator": 99, "denominator": 100}
+    assert report["apple"]["false_accept_rate"] == {
         "status": "ratio",
         "numerator": 1,
-        "denominator": 10,
+        "denominator": 20,
     }
-    assert report["apple"]["false_accept_rate"] == {"status": "not_applicable"}
+    assert report["apple"]["false_reject_rate"] == {
+        "status": "ratio",
+        "numerator": 0,
+        "denominator": 1,
+    }
     assert report["agreement_delta"] == {"numerator": 0, "denominator": 1}
     assert report["interval"]["seed"] == DEFAULT_SEED
     assert report["interval"]["resamples"] == DEFAULT_RESAMPLES
+    assert report["interval"]["method"].startswith("paired child-cluster bootstrap")
     assert report["interval"]["low"] == {"numerator": 0, "denominator": 1}
     assert report["clearly_beats"]["sarvam_wins"] is False
 
@@ -85,7 +100,7 @@ def test_module_entrypoint_prints_sarvam() -> None:
     )
     assert completed.returncode == 0
     assert completed.stdout == "SARVAM\n"
-    assert completed.stderr == ""
+    assert completed.stderr == f"seed={DEFAULT_SEED}\n"
 
 
 def test_no_go_exits_zero() -> None:
@@ -103,3 +118,4 @@ def test_no_go_exits_zero() -> None:
     )
     assert completed.returncode == 0
     assert completed.stdout == "NO_GO\n"
+    assert completed.stderr == f"seed={DEFAULT_SEED}\n"

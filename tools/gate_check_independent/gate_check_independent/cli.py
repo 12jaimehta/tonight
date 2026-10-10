@@ -47,8 +47,7 @@ def main(argv: list[str] | None = None) -> int:
         default=f"{DEFAULT_CONFIDENCE.numerator}/{DEFAULT_CONFIDENCE.denominator}",
         help=(
             "two-sided confidence level as a fraction or decimal "
-            f"(default {DEFAULT_CONFIDENCE.numerator}/{DEFAULT_CONFIDENCE.denominator}; "
-            "the plan does not name a level)"
+            f"(default {DEFAULT_CONFIDENCE.numerator}/{DEFAULT_CONFIDENCE.denominator})"
         ),
     )
     parser.add_argument(
@@ -84,6 +83,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("\n")
     else:
         print(result.decision)
+    print(f"seed={result.interval.seed}", file=sys.stderr)
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
     return 0
 
 

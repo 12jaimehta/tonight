@@ -12,8 +12,8 @@ from gate_check_independent.errors import GateCheckError
 FAST = {"resamples": 20, "seed": 1}
 
 
-def test_agreement_exactly_nine_tenths_passes() -> None:
-    # 1800/2000 = 9/10 and the false-reject rate is 200/2000 = 1/10.
+def test_all_reference_correct_is_an_invalid_study() -> None:
+    # Agreement is 9/10 and false-reject is 1/10, but the false-accept denominator is 0.
     payload = study(
         [
             child(
@@ -23,12 +23,38 @@ def test_agreement_exactly_nine_tenths_passes() -> None:
             )
         ]
     )
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "INVALID_STUDY"
+    assert "false-accept" in caught.value.message
+
+
+def test_agreement_exactly_nine_tenths_is_inclusive_on_a_valid_study() -> None:
+    # 18/20 = 9/10. False-accept 1/10 fails its own bar, so the decision is NO_GO.
+    payload = study(
+        [
+            child(
+                "c",
+                7,
+                [
+                    recording(
+                        "r",
+                        [
+                            agreed(True, True, 9),
+                            agreed(True, False, 1),
+                            agreed(False, False, 9),
+                            agreed(False, True, 1),
+                        ],
+                    )
+                ],
+            )
+        ]
+    )
     result = evaluate(payload, **FAST)
     assert result.apple.agreement == Fraction(9, 10)
-    assert result.apple.false_reject_rate == Fraction(1, 10)
-    assert result.apple.passes
-    assert result.sarvam.passes
-    assert result.decision == "APPLE"
+    assert result.apple.agreement_ok
+    assert result.apple.false_accept_ok is False
+    assert result.decision == "NO_GO"
 
 
 def test_one_match_under_nine_tenths_fails() -> None:
@@ -37,22 +63,31 @@ def test_one_match_under_nine_tenths_fails() -> None:
             child(
                 "c",
                 7,
-                [recording("r", [agreed(True, True, 1799), agreed(True, False, 201)])],
+                [
+                    recording(
+                        "r",
+                        [agreed(True, True, 80), agreed(True, False, 20), agreed(False, False, 10)],
+                    )
+                ],
             )
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(1799, 2000)
+    assert result.apple.agreement == Fraction(90, 110)
     assert result.apple.agreement < Fraction(9, 10)
     assert result.apple.agreement_ok is False
     assert result.decision == "NO_GO"
 
 
 def test_pooled_agreement_is_not_the_mean_of_child_rates() -> None:
-    # Child rates are 1 and 2/5. Their mean is 7/10. The pooled rate is 9/10.
+    # Child rates are 1 and 2/5. Their mean is 7/10. Pooled matches are 118/130.
     payload = study(
         [
-            child("big", 6, [recording("big-r", [agreed(True, True, 100)])]),
+            child(
+                "big",
+                6,
+                [recording("big-r", [agreed(True, True, 100), agreed(False, False, 10)])],
+            ),
             child(
                 "small",
                 8,
@@ -61,22 +96,23 @@ def test_pooled_agreement_is_not_the_mean_of_child_rates() -> None:
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(9, 10)
+    assert result.apple.agreement == Fraction(118, 130)
     assert result.apple.false_reject_rate == Fraction(1, 10)
+    assert result.apple.false_accept_rate == Fraction(0)
     assert result.apple.passes
     assert result.decision == "APPLE"
 
 
 def test_unequal_children_below_nine_tenths_fail_even_if_a_mean_would_pass() -> None:
-    # Rates 1 and 4/5. The unweighted mean is 9/10. Pooled matches are 100/120.
+    # Rates 1 and 4/5. The unweighted mean is 9/10. Pooled matches are 110/130.
     payload = study(
         [
-            child("small", 6, [recording("s", [agreed(True, True, 20)])]),
+            child("small", 6, [recording("s", [agreed(True, True, 20), agreed(False, False, 10)])]),
             child("big", 7, [recording("b", [agreed(True, True, 80), agreed(True, False, 20)])]),
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(100, 120)
+    assert result.apple.agreement == Fraction(110, 130)
     assert result.apple.agreement < Fraction(9, 10)
     assert result.decision == "NO_GO"
 
@@ -305,14 +341,109 @@ def test_false_reject_over_one_tenth_fails_while_agreement_stays_above_ninety() 
     assert result.decision == "NO_GO"
 
 
-def test_undefined_false_reject_does_not_pass() -> None:
+def test_no_reference_correct_words_is_an_invalid_study() -> None:
     payload = study([child("c", 7, [recording("r", [agreed(False, False, 20)])])])
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "INVALID_STUDY"
+    assert "false-reject" in caught.value.message
+
+
+def test_recording_with_no_reference_correct_words_does_not_fail_false_reject() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                7,
+                [
+                    recording("misses-only", [agreed(False, False, 10)]),
+                    recording(
+                        "reads",
+                        [agreed(True, True, 90), agreed(True, False, 10)],
+                    ),
+                ],
+            )
+        ]
+    )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(1)
+    assert result.apple.reference_correct == 100
+    assert result.apple.false_reject_rate == Fraction(1, 10)
     assert result.apple.false_accept_rate == Fraction(0)
-    assert result.apple.false_reject_rate is None
-    assert result.apple.false_reject_ok is False
-    assert result.decision == "NO_GO"
+    assert result.apple.passes
+    assert result.decision == "APPLE"
+
+
+def test_recording_with_no_reference_incorrect_words_adds_zero_to_false_accept() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                6,
+                [
+                    recording(
+                        "errors",
+                        [agreed(False, True, 1), agreed(False, False, 19)],
+                    ),
+                    recording("clean", [agreed(True, True, 100)]),
+                ],
+            )
+        ]
+    )
+    result = evaluate(payload, **FAST)
+    assert result.apple.false_accepts == 1
+    assert result.apple.reference_incorrect == 20
+    assert result.apple.false_accept_rate == Fraction(1, 20)
+    assert result.apple.passes
+    assert result.decision == "APPLE"
+
+
+def test_no_per_child_false_reject_cap() -> None:
+    payload = study(
+        [
+            child("hot", 6, [recording("hot-r", [agreed(True, False, 10)])]),
+            child(
+                "calm",
+                8,
+                [recording("calm-r", [agreed(True, True, 200), agreed(False, False, 10)])],
+            ),
+        ]
+    )
+    result = evaluate(payload, **FAST)
+    assert result.apple.false_reject_rate == Fraction(10, 210)
+    assert result.apple.false_reject_rate <= Fraction(1, 10)
+    assert result.apple.passes
+    assert result.decision == "APPLE"
+
+
+def test_unjudged_words_are_excluded_from_agreement() -> None:
+    judged = study(
+        [
+            child(
+                "c",
+                7,
+                [recording("r", [agreed(True, True, 9), agreed(False, False, 1)])],
+            )
+        ]
+    )
+    with_unjudged = study(
+        [
+            child(
+                "c",
+                7,
+                [
+                    recording(
+                        "r",
+                        [
+                            agreed(True, True, 9),
+                            agreed(False, False, 1),
+                            cell(None, True, False, 40),
+                        ],
+                    )
+                ],
+            )
+        ]
+    )
+    assert evaluate(judged, **FAST) == evaluate(with_unjudged, **FAST)
 
 
 def test_one_child_over_the_cap_is_no_go_for_both_engines() -> None:

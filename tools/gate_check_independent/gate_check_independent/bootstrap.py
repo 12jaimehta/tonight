@@ -1,14 +1,13 @@
-"""Paired bootstrap of the pooled agreement difference.
+"""Paired child-cluster bootstrap of the pooled agreement difference.
 
-The M0 note asks for a paired interval on the same recordings, and treats an
-interval that overlaps zero as a win for Apple. It does not define the draw
-method. This module therefore uses its own:
+The ruled interval is a 95% percentile interval from 10,000 draws of a fixed
+seed. The cluster is the child: every recording of a drawn child moves
+together, because recordings from the same child are not independent.
 
-- cluster = one recording (the words inside it stay together)
 - statistic = pooled Sarvam agreement minus pooled Apple agreement,
-  word-weighted across the resampled recordings
+  word-weighted across the recordings in the resampled children
 - generator = ``random.Random`` (MT19937), seeded once per call
-- draws = ``randrange`` over the recording list, with no extra bit mixing
+- draws = ``randrange`` over the child list, with no extra bit mixing
 - interval = two-sided Hyndman–Fan type-7 percentile
 
 A lower endpoint of exactly zero overlaps zero. Callers treat Sarvam as the
@@ -23,7 +22,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from gate_check_independent.errors import GateCheckError
-from gate_check_independent.types import RecordingTotals
+from gate_check_independent.types import Child, RecordingTotals
 
 
 @dataclass(frozen=True)
@@ -81,32 +80,33 @@ def percentile_type7(sorted_samples: Sequence[Fraction], probability: Fraction) 
 
 
 def resampled_deltas(
-    recordings: Sequence[RecordingTotals],
+    children: Sequence[Child],
     *,
     resamples: int,
     seed: int,
 ) -> list[Fraction]:
     """Return one pooled agreement difference per bootstrap replicate.
 
-    Each replicate draws ``len(recordings)`` recordings with replacement.
-    The generator is ``random.Random(seed)`` and the only calls made on it
-    are ``randrange(n)``.
+    Each replicate draws ``len(children)`` children with replacement. All of
+    a drawn child's recordings stay together. The generator is
+    ``random.Random(seed)`` and the only calls made on it are ``randrange(n)``.
     """
 
-    if not recordings:
-        raise GateCheckError("INSUFFICIENT_DATA", "bootstrap needs at least one recording")
-    population = tuple(recordings)
+    if not children:
+        raise GateCheckError("INSUFFICIENT_DATA", "bootstrap needs at least one child")
+    population = tuple(children)
     count = len(population)
     generator = random.Random(seed)
     deltas: list[Fraction] = []
     for _ in range(resamples):
         draw = tuple(population[generator.randrange(count)] for _ in range(count))
-        deltas.append(pooled_agreement_delta(draw))
+        recordings = tuple(recording for child in draw for recording in child.recordings)
+        deltas.append(pooled_agreement_delta(recordings))
     return deltas
 
 
 def agreement_interval(
-    recordings: Sequence[RecordingTotals],
+    children: Sequence[Child],
     *,
     resamples: int,
     seed: int,
@@ -118,7 +118,7 @@ def agreement_interval(
         raise GateCheckError("INVALID_INPUT", "confidence must be a Fraction")
     if not 0 < confidence < 1:
         raise GateCheckError("INVALID_INPUT", "confidence must be strictly between 0 and 1")
-    samples = resampled_deltas(recordings, resamples=resamples, seed=seed)
+    samples = resampled_deltas(children, resamples=resamples, seed=seed)
     samples.sort()
     tail = (1 - confidence) / 2
     return AgreementInterval(

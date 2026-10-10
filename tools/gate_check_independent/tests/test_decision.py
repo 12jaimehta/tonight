@@ -98,7 +98,7 @@ def test_neither_passing_is_no_go() -> None:
 
 def test_uniform_plus_two_points_picks_apple() -> None:
     result = evaluate(_uniform(90, 92), **FAST)
-    assert result.agreement_delta == Fraction(1, 50)
+    assert result.agreement_delta == Fraction(1, 60)
     assert result.interval.low == result.agreement_delta
     assert result.interval.low > 0
     assert result.apple.passes and result.sarvam.passes
@@ -121,9 +121,9 @@ def test_uniform_plus_six_points_picks_sarvam_with_a_degenerate_interval() -> No
 
 
 def test_exactly_five_points_on_two_thousand_words_picks_sarvam() -> None:
-    result = evaluate(_margin_payload(100), **FAST)
+    result = evaluate(_margin_payload(102), **FAST)
     assert result.agreement_delta == Fraction(1, 20)
-    assert result.apple.agreement == Fraction(9, 10)
+    assert result.apple.agreement == Fraction(1840, 2040)
     assert result.apple.false_reject_rate == Fraction(1, 10)
     assert result.interval.low == Fraction(1, 20)
     assert result.sarvam.comparable_false_accept() == result.apple.comparable_false_accept()
@@ -131,8 +131,8 @@ def test_exactly_five_points_on_two_thousand_words_picks_sarvam() -> None:
 
 
 def test_one_word_under_five_points_picks_apple() -> None:
-    result = evaluate(_margin_payload(99), **FAST)
-    assert result.agreement_delta == Fraction(99, 2000)
+    result = evaluate(_margin_payload(101), **FAST)
+    assert result.agreement_delta == Fraction(101, 2040)
     assert result.agreement_delta < Fraction(1, 20)
     assert result.interval.strictly_above_zero
     assert result.apple.passes and result.sarvam.passes
@@ -142,8 +142,8 @@ def test_one_word_under_five_points_picks_apple() -> None:
 
 def test_margin_met_but_bootstrap_interval_crosses_zero_picks_apple() -> None:
     children = []
-    ahead = [cell(True, True, True, 90), cell(True, False, True, 10)]
-    behind = [cell(True, True, True, 80), cell(True, True, False, 20)]
+    ahead = [cell(True, True, True, 88), cell(True, False, True, 12), cell(False, False, False, 20)]
+    behind = [cell(True, True, True, 76), cell(True, True, False, 24), cell(False, False, False, 20)]
     for index in range(10):
         children.append(child(f"a{index}", 7, [recording(f"a{index}-r", ahead)]))
     for index in range(2):
@@ -160,8 +160,8 @@ def test_margin_met_but_bootstrap_interval_crosses_zero_picks_apple() -> None:
 @pytest.mark.parametrize("seed", [1, 7, 99])
 def test_crossing_zero_stays_apple_for_other_seeds(seed: int) -> None:
     children = []
-    ahead = [cell(True, True, True, 90), cell(True, False, True, 10)]
-    behind = [cell(True, True, True, 80), cell(True, True, False, 20)]
+    ahead = [cell(True, True, True, 88), cell(True, False, True, 12), cell(False, False, False, 20)]
+    behind = [cell(True, True, True, 76), cell(True, True, False, 24), cell(False, False, False, 20)]
     for index in range(10):
         children.append(child(f"a{index}", 6, [recording(f"a{index}-r", ahead)]))
     for index in range(2):
@@ -185,6 +185,7 @@ def test_only_sarvam_passes_when_apple_agreement_is_85_percent() -> None:
                             cell(True, True, True, 85),
                             cell(True, False, True, 12),
                             cell(True, False, False, 3),
+                            cell(False, False, False, 20),
                         ],
                     )
                 ],
@@ -192,14 +193,15 @@ def test_only_sarvam_passes_when_apple_agreement_is_85_percent() -> None:
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(85, 100)
+    assert result.apple.agreement == Fraction(105, 120)
     assert result.apple.passes is False
-    assert result.sarvam.agreement == Fraction(97, 100)
+    assert result.sarvam.agreement == Fraction(117, 120)
     assert result.sarvam.passes
     assert result.decision == "SARVAM"
 
 
-def test_sarvam_at_exactly_ninety_still_wins_when_apple_fails() -> None:
+def test_only_sarvam_passing_does_not_need_a_five_point_lead() -> None:
+    # Apple's false-accept is 10/100. Sarvam's is 4/100. The agreement gap is 5/200.
     payload = study(
         [
             child(
@@ -208,15 +210,28 @@ def test_sarvam_at_exactly_ninety_still_wins_when_apple_fails() -> None:
                 [
                     recording(
                         "r",
-                        [cell(True, True, True, 50), cell(True, False, True, 40), cell(True, False, False, 10)],
+                        [
+                            cell(True, True, True, 93),
+                            cell(True, False, True, 2),
+                            cell(True, True, False, 3),
+                            cell(True, False, False, 2),
+                            cell(False, True, True, 4),
+                            cell(False, True, False, 6),
+                            cell(False, False, False, 90),
+                        ],
                     )
                 ],
             )
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(1, 2)
-    assert result.sarvam.agreement == Fraction(9, 10)
+    assert result.apple.agreement == Fraction(186, 200)
+    assert result.apple.false_accept_rate == Fraction(1, 10)
+    assert result.apple.passes is False
+    assert result.sarvam.agreement == Fraction(191, 200)
+    assert result.agreement_delta == Fraction(5, 200)
+    assert result.agreement_delta < Fraction(1, 20)
+    assert result.sarvam.passes
     assert result.decision == "SARVAM"
 
 
@@ -233,6 +248,7 @@ def test_only_apple_passes_when_sarvam_agreement_fails() -> None:
                             cell(True, True, True, 85),
                             cell(True, True, False, 12),
                             cell(True, False, False, 3),
+                            cell(False, False, False, 20),
                         ],
                     )
                 ],
@@ -240,8 +256,8 @@ def test_only_apple_passes_when_sarvam_agreement_fails() -> None:
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(97, 100)
-    assert result.sarvam.agreement == Fraction(85, 100)
+    assert result.apple.agreement == Fraction(117, 120)
+    assert result.sarvam.agreement == Fraction(105, 120)
     assert result.decision == "APPLE"
 
 
@@ -337,6 +353,31 @@ def test_child_cap_alone_can_eliminate_sarvam() -> None:
     assert result.decision == "APPLE"
 
 
+def test_child_cluster_keeps_a_childs_recordings_together() -> None:
+    # Each child mixes a +10 recording and a -4 recording. The child delta is
+    # 6/110. Resampling children leaves that interval degenerate.
+    payload = study(
+        [
+            child(
+                f"c{index}",
+                7,
+                [
+                    recording(f"c{index}-ahead", [cell(True, True, True, 40), cell(True, False, True, 10)]),
+                    recording(f"c{index}-behind", [cell(True, True, True, 46), cell(True, True, False, 4)]),
+                    recording(f"c{index}-misses", [cell(False, False, False, 10)]),
+                ],
+            )
+            for index in range(4)
+        ]
+    )
+    result = evaluate(payload, **FAST)
+    assert result.agreement_delta == Fraction(6, 110)
+    assert result.interval.low == Fraction(6, 110)
+    assert result.interval.high == Fraction(6, 110)
+    assert result.apple.passes and result.sarvam.passes
+    assert result.decision == "SARVAM"
+
+
 def test_both_failing_agreement_is_no_go_even_if_sarvam_is_ahead() -> None:
     payload = study(
         [
@@ -346,15 +387,20 @@ def test_both_failing_agreement_is_no_go_even_if_sarvam_is_ahead() -> None:
                 [
                     recording(
                         "r",
-                        [cell(True, True, True, 70), cell(True, False, True, 10), cell(True, False, False, 20)],
+                        [
+                            cell(True, True, True, 70),
+                            cell(True, False, True, 10),
+                            cell(True, False, False, 20),
+                            cell(False, False, False, 10),
+                        ],
                     )
                 ],
             )
         ]
     )
     result = evaluate(payload, **FAST)
-    assert result.apple.agreement == Fraction(70, 100)
-    assert result.sarvam.agreement == Fraction(80, 100)
+    assert result.apple.agreement == Fraction(80, 110)
+    assert result.sarvam.agreement == Fraction(90, 110)
     assert result.decision == "NO_GO"
 
 
@@ -374,6 +420,7 @@ def _uniform(apple_matches: int, sarvam_matches: int) -> dict:
                             cell(True, True, True, both),
                             cell(True, False, True, sarvam_only),
                             cell(True, False, False, neither),
+                            cell(False, False, False, 20),
                         ],
                     )
                 ],
@@ -383,10 +430,11 @@ def _uniform(apple_matches: int, sarvam_matches: int) -> dict:
 
 
 def _plus_six_cells() -> list[dict]:
+    # 9 extra Sarvam matches on 150 judged words is exactly +6 points.
     return [
-        cell(True, True, True, 90),
-        cell(True, False, True, 6),
-        cell(True, False, False, 4),
+        cell(True, True, True, 91),
+        cell(True, False, True, 9),
+        cell(False, False, False, 50),
     ]
 
 
@@ -403,6 +451,7 @@ def _margin_payload(sarvam_extra: int) -> dict:
                             cell(True, True, True, 1800),
                             cell(True, False, True, sarvam_extra),
                             cell(True, False, False, 200 - sarvam_extra),
+                            cell(False, False, False, 40),
                         ],
                     )
                 ],

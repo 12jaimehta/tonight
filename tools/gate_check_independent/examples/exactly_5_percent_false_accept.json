@@ -4,6 +4,7 @@
     {
       "child_id": "c1",
       "age": 7,
+      "school_class": 2,
       "recordings": [
         {
           "recording_id": "c1-passage",

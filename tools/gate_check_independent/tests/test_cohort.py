@@ -46,8 +46,61 @@ def test_integer_age_outside_6_to_8_is_out_of_cohort(age: int) -> None:
 
 @pytest.mark.parametrize("age", [6, 7, 8])
 def test_ages_6_7_and_8_can_be_scored(age: int) -> None:
-    payload = study([child("c", age, [recording("r", [agreed(True, True, 10)])])])
+    payload = study(
+        [child("c", age, [recording("r", [agreed(True, True, 10), agreed(False, False, 1)])])]
+    )
     assert evaluate(payload, **FAST).decision == "APPLE"
+
+
+@pytest.mark.parametrize("school_class", [0, 4, 5, -1])
+def test_class_outside_1_to_3_is_out_of_cohort(school_class: int) -> None:
+    payload = study([child("c", 7, [recording("r", WORD)], school_class=school_class)])
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "OUT_OF_COHORT"
+    assert f"class {school_class}" in caught.value.message
+
+
+def test_missing_class_is_out_of_cohort() -> None:
+    payload = study([child("c", 7, [recording("r", WORD)])])
+    del payload["children"][0]["school_class"]
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "OUT_OF_COHORT"
+    assert "missing a class" in caught.value.message
+
+
+def test_null_class_is_out_of_cohort() -> None:
+    payload = study([child("c", 7, [recording("r", WORD)], school_class=None)])
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "OUT_OF_COHORT"
+    assert "missing a class" in caught.value.message
+
+
+def test_age_class_mismatch_warns_and_still_decides() -> None:
+    payload = study(
+        [
+            child(
+                "c",
+                6,
+                [recording("r", [agreed(True, True, 10), agreed(False, False, 2)])],
+                school_class=3,
+            )
+        ]
+    )
+    result = evaluate(payload, **FAST)
+    assert result.decision == "APPLE"
+    assert result.warnings == ("child c age 6 is paired with class 3; expected class 1",)
+
+
+def test_matching_age_and_class_has_no_warning() -> None:
+    payload = study(
+        [child("c", 8, [recording("r", [agreed(True, True, 10), agreed(False, False, 1)])])]
+    )
+    result = evaluate(payload, **FAST)
+    assert result.warnings == ()
+    assert payload["children"][0]["school_class"] == 3
 
 
 def test_every_out_of_cohort_child_is_named() -> None:
@@ -66,13 +119,19 @@ def test_every_out_of_cohort_child_is_named() -> None:
     assert "c " not in caught.value.message
 
 
-def test_school_class_does_not_change_the_decision() -> None:
-    base = json.loads((EXAMPLES / "exactly_090.json").read_text(encoding="utf-8"))
-    shifted = json.loads((EXAMPLES / "exactly_090.json").read_text(encoding="utf-8"))
+def test_out_of_range_class_on_a_file_is_rejected() -> None:
+    shifted = json.loads((EXAMPLES / "exactly_5_percent_false_accept.json").read_text(encoding="utf-8"))
     shifted["children"][0]["school_class"] = 9
-    shifted["children"][1]["school_class"] = "not-a-class"
-    shifted["cohort"] = "pilot"
-    assert evaluate(base, **FAST) == evaluate(shifted, **FAST)
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(shifted, **FAST)
+    assert caught.value.code == "OUT_OF_COHORT"
+
+
+def test_non_integer_class_is_invalid_input() -> None:
+    payload = study([child("c", 7, [recording("r", WORD)], school_class="2")])
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "INVALID_INPUT"
 
 
 @pytest.mark.parametrize(
@@ -123,9 +182,15 @@ def test_words_and_cells_describe_the_same_recording() -> None:
 
 
 def test_duplicate_cells_are_summed() -> None:
-    combined = study([child("c", 7, [recording("r", [agreed(True, True, 19)])])])
+    combined = study([child("c", 7, [recording("r", [agreed(True, True, 19), agreed(False, False, 1)])])])
     split = study(
-        [child("c", 7, [recording("r", [agreed(True, True, 10), agreed(True, True, 9)])])]
+        [
+            child(
+                "c",
+                7,
+                [recording("r", [agreed(True, True, 10), agreed(True, True, 9), agreed(False, False, 1)])],
+            )
+        ]
     )
     assert evaluate(combined, **FAST) == evaluate(split, **FAST)
 
