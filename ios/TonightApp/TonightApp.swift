@@ -53,8 +53,8 @@ enum TonightComposition {
             anonKey: config.anonKey,
             accessToken: { (try? KeychainAccessTokenStore().load()) ?? "" },
             send: { request in
-                let (_, response) = try await URLSession.shared.data(for: request)
-                return (response as? HTTPURLResponse)?.statusCode ?? 0
+                let (data, response) = try await URLSession.shared.data(for: request)
+                return ServerHTTPResponse(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: data)
             },
             queueFile: base.appendingPathComponent("Tonight/server-withdrawal-queue.json")
         )

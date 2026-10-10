@@ -430,6 +430,7 @@ final class TonightModel {
     let consentStore = InMemoryAdultConsentStore()
     let consentCenter: ConsentCenter?
     var serverWithdrawal: ServerWithdrawalClient?
+    var serverConsentID: UUID?
     let emailOTP: EmailOTPClient?
     let sessionStore: any ParentSessionStoring
     let speech: any SpeechSynthesizing
@@ -575,21 +576,37 @@ final class TonightModel {
 
     func verifyEmailCode() {
         guard signIn.verify() else { return }
-        finishSignIn(method: "email")
+        guard let emailOTP else {
+            finishSignIn(method: "email")
+            return
+        }
+        let email = signIn.email
+        let code = signIn.code
+        Task { @MainActor in
+            do {
+                let session = try await emailOTP.verify(email: email, code: code)
+                if let parent = UUID(uuidString: session.parentID) {
+                    _ = await serverWithdrawal?.createParent(id: parent)
+                }
+                authMethod = "email"
+                route = .consent
+            } catch {
+                signIn.phase = .codeError
+            }
+        }
     }
 
     func finishSignIn(method: String) {
         authMethod = method
-        let session = ParentSession.issue(parentID: "parent-placeholder", at: Date())
-        try? sessionStore.save(session)
         route = .consent
     }
 
     func agreeToConsent() {
         guard consent.canContinue else { return }
         consent.saving = true
+        let parentID = (try? sessionStore.load())?.parentID ?? ""
         let record = AdultConsentRecord(
-            parentID: "parent-placeholder",
+            parentID: parentID,
             acceptedAt: Date(),
             method: authMethod
         )
@@ -603,6 +620,30 @@ final class TonightModel {
         child = profile
         editor = SubjectsEditor(child: profile)
         route = .subjects
+        Task { await publishChild(profile) }
+    }
+
+    private func publishChild(_ profile: ChildProfile) async {
+        guard let serverWithdrawal,
+              let parent = UUID(uuidString: (try? sessionStore.load())?.parentID ?? "") else { return }
+        _ = await serverWithdrawal.createChild(
+            id: profile.id,
+            parentID: parent,
+            nickname: profile.nickname,
+            schoolClass: profile.schoolClass ?? "1"
+        )
+        let consentID = UUID()
+        serverConsentID = consentID
+        _ = await serverWithdrawal.createConsent(id: consentID, parentID: parent, childID: profile.id)
+        try? consentCenter?.grant(AudioConsentRecord(
+            id: consentID,
+            parentID: parent.uuidString.lowercased(),
+            childProfileID: profile.id,
+            scopes: [.onDevice],
+            tappedAt: Date(),
+            method: "screen",
+            backendConfirmed: true
+        ))
     }
 
     func finishSubjects() {
@@ -749,6 +790,13 @@ final class TonightModel {
         gate.resetForBackground()
     }
 
+    func refreshWithdrawalQueue() async {
+        if let emailOTP {
+            _ = try? await emailOTP.refreshSession()
+        }
+        _ = await serverWithdrawal?.flush()
+    }
+
     func askWithdrawal() {
         confirmingWithdrawal = true
     }
@@ -776,7 +824,7 @@ final class TonightModel {
                 withdrawalNotice = "No consent on file"
                 return
             }
-            let consentID = existing.id
+            let consentID = serverConsentID ?? existing.id
             _ = try await consentCenter.withdraw(childProfileID: childID, at: Date())
             await serverWithdrawal?.submit(childID: childID, consentRecordID: consentID)
             withdrawalLocal = localInventory(childID)
