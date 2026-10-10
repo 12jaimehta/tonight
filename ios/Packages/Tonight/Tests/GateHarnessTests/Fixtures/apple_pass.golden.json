@@ -29,6 +29,11 @@
     "referenceIncorrect": 16
   },
   "decision": "APPLE",
+  "deltaAgreement": "-1/4",
+  "deltaCI": [
+    "-1/4",
+    "-1/4"
+  ],
   "sarvam": {
     "agreement": "3/4",
     "agreementCI": [
@@ -57,5 +62,6 @@
     },
     "referenceCorrect": 48,
     "referenceIncorrect": 16
-  }
+  },
+  "scoringVersion": 2
 }

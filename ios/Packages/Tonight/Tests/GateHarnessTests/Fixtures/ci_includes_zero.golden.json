@@ -5,7 +5,7 @@
       "9/10",
       "9/10"
     ],
-    "agreements": 3600,
+    "agreements": 180,
     "falseAcceptCI": [
       "0/1",
       "0/1"
@@ -13,46 +13,58 @@
     "falseAcceptRate": "0/1",
     "falseAccepts": 0,
     "falseRejectRate": "1/10",
-    "falseRejects": 400,
-    "paired": 4000,
+    "falseRejects": 20,
+    "paired": 200,
     "perChildFalseAccept": {
       "c00": "n/a",
       "c01": "n/a",
       "c02": "n/a",
-      "c03": "n/a"
+      "c03": "n/a",
+      "c04": "n/a",
+      "c05": "n/a",
+      "c06": "n/a",
+      "c07": "n/a",
+      "c08": "n/a",
+      "c09": "n/a"
     },
-    "referenceCorrect": 4000,
+    "referenceCorrect": 200,
     "referenceIncorrect": 0
   },
   "decision": "APPLE",
-  "deltaAgreement": "1/1000",
+  "deltaAgreement": "1/20",
   "deltaCI": [
-    "1/1000",
-    "1/1000"
+    "-1/20",
+    "1/10"
   ],
   "sarvam": {
-    "agreement": "901/1000",
+    "agreement": "19/20",
     "agreementCI": [
-      "901/1000",
-      "901/1000"
+      "17/20",
+      "1/1"
     ],
-    "agreements": 3604,
+    "agreements": 190,
     "falseAcceptCI": [
       "0/1",
       "0/1"
     ],
     "falseAcceptRate": "0/1",
     "falseAccepts": 0,
-    "falseRejectRate": "99/1000",
-    "falseRejects": 396,
-    "paired": 4000,
+    "falseRejectRate": "1/20",
+    "falseRejects": 10,
+    "paired": 200,
     "perChildFalseAccept": {
       "c00": "n/a",
       "c01": "n/a",
       "c02": "n/a",
-      "c03": "n/a"
+      "c03": "n/a",
+      "c04": "n/a",
+      "c05": "n/a",
+      "c06": "n/a",
+      "c07": "n/a",
+      "c08": "n/a",
+      "c09": "n/a"
     },
-    "referenceCorrect": 4000,
+    "referenceCorrect": 200,
     "referenceIncorrect": 0
   },
   "scoringVersion": 2

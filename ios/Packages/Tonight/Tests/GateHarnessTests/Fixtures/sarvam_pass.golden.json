@@ -28,7 +28,12 @@
     "referenceCorrect": 48,
     "referenceIncorrect": 16
   },
-  "decision": "SARVAM",
+  "decision": "NO_GO",
+  "deltaAgreement": "1/4",
+  "deltaCI": [
+    "1/4",
+    "1/4"
+  ],
   "sarvam": {
     "agreement": "1/1",
     "agreementCI": [
@@ -57,5 +62,6 @@
     },
     "referenceCorrect": 48,
     "referenceIncorrect": 16
-  }
+  },
+  "scoringVersion": 2
 }
