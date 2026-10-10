@@ -232,6 +232,24 @@ jobs:
           -destination '${{ steps.sim.outputs.destination }}'
           CODE_SIGNING_ALLOWED=NO
 
+      - name: Release binary omits the Sarvam adapter
+        if: steps.app.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            ${{ steps.app.outputs.flag }} ${{ steps.app.outputs.path }} \
+            -scheme Tonight \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath "$RUNNER_TEMP/tonight-release"
+          bin="$(find "$RUNNER_TEMP/tonight-release" -type f -name Tonight -perm -111 | head -1)"
+          test -n "$bin"
+          if strings "$bin" | grep -E 'audioBase64|api\.sarvam\.ai'; then
+            echo "Release binary still contains the study speech adapter"
+            exit 1
+          fi
+
   backend:
     name: backend deno
     runs-on: ubuntu-latest

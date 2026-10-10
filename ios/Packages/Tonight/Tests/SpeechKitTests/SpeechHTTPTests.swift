@@ -20,8 +20,13 @@ final class SpeechHTTPTests: XCTestCase {
         XCTAssertEqual(outcome.engine, .appleOnDevice)
         XCTAssertEqual(outcome.transcript, "the cat sat")
         XCTAssertNotEqual(outcome.transcript, "")
+        #if STUDY
         XCTAssertEqual(outcome.fallbackReason, SelectionReason.serverError.rawValue)
         XCTAssertEqual(outcome.bytesSent, 12)
+        #else
+        XCTAssertNil(outcome.fallbackReason)
+        XCTAssertEqual(outcome.bytesSent, 0)
+        #endif
     }
 
     func test_LAT07_serverFailureIsNotAWrongMark() async {
@@ -31,18 +36,27 @@ final class SpeechHTTPTests: XCTestCase {
             input: eligible(),
             attemptID: UUID()
         )
-        XCTAssertEqual(outcome.fallbackReason, "serverError")
         XCTAssertEqual(outcome.transcript, "kept")
         XCTAssertFalse(outcome.parentMarking)
+        #if STUDY
+        XCTAssertEqual(outcome.fallbackReason, "serverError")
+        #else
+        XCTAssertNil(outcome.fallbackReason)
+        #endif
     }
 
     func test_CG21_bytesSentComeFromTheTransport() async {
         let transport = ScriptedTransport(.fail(.cancelled(bytesSent: 48)))
         let runner = runner(transport, localEngine("local"))
         let outcome = await runner.run(audio: SpeechAudio(samples: Data([1])), input: eligible(), attemptID: UUID())
+        #if STUDY
         XCTAssertEqual(outcome.bytesSent, 48)
         XCTAssertEqual(outcome.fallbackReason, "cancelled")
         XCTAssertEqual(runner.audit.snapshot().last?.cancelledAfterBytes, 48)
+        #else
+        XCTAssertEqual(outcome.bytesSent, 0)
+        XCTAssertNil(outcome.fallbackReason)
+        #endif
     }
 
     func test_CG22_emptyTranscriptFallsBack() async {
@@ -53,8 +67,12 @@ final class SpeechHTTPTests: XCTestCase {
             attemptID: UUID()
         )
         XCTAssertEqual(outcome.transcript, "on device")
-        XCTAssertEqual(outcome.fallbackReason, "serverError")
         XCTAssertNotEqual(outcome.engine, .sarvam)
+        #if STUDY
+        XCTAssertEqual(outcome.fallbackReason, "serverError")
+        #else
+        XCTAssertNil(outcome.fallbackReason)
+        #endif
     }
 
     private func runner(_ transport: ScriptedTransport, _ onDevice: FakeSpeechEngine) -> SpeechAttemptRunner {

@@ -37,11 +37,18 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(selection.maySendAudio)
     }
 
-    func testCG06_serverEligible() {
+    func test_CG17_NET14_releaseBuildLeavesTheServerBranchOut() {
+        XCTAssertFalse(ServerSpeechBuild.isStudyBuild)
         let selection = SpeechEngineSelector.select(eligibleInput(record: record(scopes: [.onDevice, .server])))
-        XCTAssertEqual(selection.engine, .sarvam)
-        XCTAssertTrue(selection.maySendAudio)
-        XCTAssertEqual(selection.reason, .serverEligible)
+        XCTAssertEqual(selection.engine, .appleOnDevice)
+        XCTAssertEqual(selection.reason, .releaseBuild)
+        XCTAssertFalse(selection.maySendAudio)
+        let source = try! String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/SpeechKit/SpeechAttemptRunner.swift"))
+        XCTAssertTrue(source.contains("#if STUDY\nenum SarvamRequestBody"))
     }
 
     func testCG07_withdrawnServer_isOnDeviceEvenOffline() {
@@ -210,17 +217,11 @@ final class SpeechPolicyTests: XCTestCase {
             input: eligibleInput(record: record(scopes: [.onDevice, .server])),
             attemptID: UUID()
         )
-        XCTAssertEqual(outcome.engine, .sarvam)
-        XCTAssertGreaterThan(outcome.bytesSent, 0)
+        XCTAssertNotEqual(outcome.engine, .sarvam)
+        XCTAssertEqual(outcome.bytesSent, 0)
         let posts = await transport.posts
-        XCTAssertEqual(posts.count, 1)
-        XCTAssertEqual(posts[0].url.host, "project-ref.supabase.co")
-        XCTAssertEqual(posts[0].url.path, "/functions/v1/sarvam-proxy")
-        XCTAssertNil(posts[0].headers["x-api-key"])
-        XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("sarvam") })
-        let body = try! JSONSerialization.jsonObject(with: posts[0].body) as! [String: String]
-        XCTAssertNil(body["apiKey"])
-        XCTAssertEqual(runner.callLogs.snapshot().count, 1)
+        XCTAssertEqual(posts.count, 0)
+        XCTAssertEqual(runner.callLogs.snapshot().count, 0)
     }
 
     func testNonEligibleStatesSendZeroBytes() async {
@@ -255,6 +256,8 @@ final class SpeechPolicyTests: XCTestCase {
             attemptID: UUID()
         )
         XCTAssertEqual(outcome.engine, .appleOnDevice)
+        XCTAssertEqual(outcome.transcript, "the cat")
+        #if STUDY
         XCTAssertEqual(outcome.fallbackReason, "timeout")
         XCTAssertTrue(outcome.usedSameBuffer)
         XCTAssertEqual(outcome.bytesSent, 0)
@@ -262,6 +265,11 @@ final class SpeechPolicyTests: XCTestCase {
         let cancelled = await transport.wasCancelled()
         XCTAssertTrue(cancelled)
         XCTAssertEqual(runner.audit.snapshot().last?.cancelledAfterBytes != nil, true)
+        #else
+        XCTAssertNil(outcome.fallbackReason)
+        XCTAssertEqual(outcome.bytesSent, 0)
+        XCTAssertEqual(await transport.posts.count, 0)
+        #endif
     }
 
     func testLAT06_onDeviceUnavailableAfterOfflineIsParentMarking() async {

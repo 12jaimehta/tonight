@@ -210,6 +210,7 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
     }
 }
 
+#if STUDY
 enum SarvamRequestBody {
     static func encode(audio: SpeechAudio, locale: String, consent: AudioConsentRecord) -> Data {
         let payload: [String: String] = [
@@ -222,6 +223,7 @@ enum SarvamRequestBody {
         return try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
     }
 }
+#endif
 
 public struct SpeechAttemptRunner: Sendable {
     public var transport: any ProxyTransporting
@@ -266,7 +268,11 @@ public struct SpeechAttemptRunner: Sendable {
             audit(selection, input: input, attemptID: attemptID, bytes: 0, cancelled: nil, engineOverride: outcome.engine)
             return outcome
         case .sarvam:
+            #if STUDY
             return await transcribeServer(audio: audio, input: input, attemptID: attemptID, locale: locale, selection: selection)
+            #else
+            return await fallbackOnDevice(audio: audio, input: input, attemptID: attemptID, locale: locale, reason: .releaseBuild, bytesSent: 0)
+            #endif
         }
     }
 
@@ -275,6 +281,7 @@ public struct SpeechAttemptRunner: Sendable {
         await transport.cancelAll()
     }
 
+    #if STUDY
     private func transcribeServer(
         audio: SpeechAudio,
         input: SelectionInput,
@@ -367,6 +374,7 @@ public struct SpeechAttemptRunner: Sendable {
         }
         return (.timeout, fallbackBytes)
     }
+    #endif
 
     private func fallbackOnDevice(
         audio: SpeechAudio,

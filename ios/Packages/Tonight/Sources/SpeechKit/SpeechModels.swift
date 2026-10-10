@@ -268,7 +268,7 @@ public enum SpeechEngineSelector {
         guard record.scopeIsActive(.onDevice) else {
             return EngineSelection(engine: .none, reason: .onDeviceWithdrawn, maySendAudio: false)
         }
-        if serverEligible(input, record: record) {
+        if ServerSpeechBuild.isStudyBuild && serverEligible(input, record: record) {
             return EngineSelection(engine: .sarvam, reason: .serverEligible, maySendAudio: true)
         }
         if !input.onDeviceAvailable {
@@ -278,8 +278,7 @@ public enum SpeechEngineSelector {
     }
 
     private static func serverEligible(_ input: SelectionInput, record: AudioConsentRecord) -> Bool {
-        input.studyBuild
-            && input.flagOn
+        input.flagOn
             && input.sessionValid
             && input.online
             && record.backendConfirmed
@@ -288,7 +287,7 @@ public enum SpeechEngineSelector {
     }
 
     private static func onDeviceReason(_ input: SelectionInput, record: AudioConsentRecord) -> SelectionReason {
-        if !input.studyBuild { return .releaseBuild }
+        if !ServerSpeechBuild.isStudyBuild { return .releaseBuild }
         if !input.flagOn { return .flagOff }
         if !input.sessionValid { return .sessionExpired }
         if !input.online { return .offline }
