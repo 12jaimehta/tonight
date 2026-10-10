@@ -1,0 +1,53 @@
+{
+  "apple": {
+    "agreement": "2/5",
+    "agreementCI": [
+      "2/5",
+      "2/5"
+    ],
+    "agreements": 16,
+    "falseAcceptCI": [
+      "0/1",
+      "0/1"
+    ],
+    "falseAcceptRate": "0/1",
+    "falseAccepts": 0,
+    "falseRejectRate": "3/5",
+    "falseRejects": 24,
+    "paired": 40,
+    "perChildFalseAccept": {
+      "c00": "0/1",
+      "c01": "0/1",
+      "c02": "0/1",
+      "c03": "0/1"
+    },
+    "referenceCorrect": 40,
+    "referenceIncorrect": 0
+  },
+  "decision": "NO_GO",
+  "sarvam": {
+    "agreement": "2/5",
+    "agreementCI": [
+      "2/5",
+      "2/5"
+    ],
+    "agreements": 16,
+    "falseAcceptCI": [
+      "0/1",
+      "0/1"
+    ],
+    "falseAcceptRate": "0/1",
+    "falseAccepts": 0,
+    "falseRejectRate": "3/5",
+    "falseRejects": 24,
+    "paired": 40,
+    "perChildFalseAccept": {
+      "c00": "0/1",
+      "c01": "0/1",
+      "c02": "0/1",
+      "c03": "0/1"
+    },
+    "referenceCorrect": 40,
+    "referenceIncorrect": 0
+  }
+}

@@ -16,6 +16,7 @@ let package = Package(
         .library(name: "PaywallKit", targets: ["PaywallKit"]),
         .library(name: "Persistence", targets: ["Persistence"]),
         .library(name: "Telemetry", targets: ["Telemetry"]),
+        .library(name: "GateHarness", targets: ["GateHarness"]),
     ],
     targets: [
         .target(name: "DesignSystem"),
@@ -60,5 +61,12 @@ let package = Package(
 
         .target(name: "Telemetry"),
         .testTarget(name: "TelemetryTests", dependencies: ["Telemetry"]),
+
+        .target(name: "GateHarness"),
+        .testTarget(
+            name: "GateHarnessTests",
+            dependencies: ["GateHarness"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

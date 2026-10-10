@@ -250,3 +250,6 @@ jobs:
 
       - name: Check SQL migrations
         run: python3 backend/scripts/check_migrations.py
+
+      - name: Cross-check the gate harness
+        run: python3 ios/scripts/gate_harness.py
