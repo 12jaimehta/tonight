@@ -239,6 +239,7 @@ public enum SelectionReason: String, Codable, Sendable, Equatable {
     case timeout
     case serverError
     case suspended
+    case cancelled
 }
 
 public enum SelectedEngine: Sendable, Equatable {
