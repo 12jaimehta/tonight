@@ -1,6 +1,8 @@
 import { handleSarvamProxy, logLine, type ProxyDeps, type ProxyLog } from "./handler.ts";
 
 const CHILD = "11111111-1111-4111-8111-111111111111";
+const CONSENT = "22222222-2222-4222-8222-222222222222";
+const CONSENT_VERSION = "2026-10-09";
 const AUDIO_TEXT = "AUDIO_MARKER_DO_NOT_LOG";
 const TRANSCRIPT = "TRANSCRIPT_MARKER_DO_NOT_LOG";
 const AUDIO_BASE64 = btoa(AUDIO_TEXT);
@@ -31,8 +33,7 @@ Deno.test("consent denied returns 403 and does not call Sarvam", async () => {
   const seen = tracker({ parentId: "parent-1", consent: false });
   const response = await handleSarvamProxy(
     request("parent-token", {
-      child_profile_id: CHILD,
-      audio_base64: AUDIO_BASE64,
+      ...contractBody(),
       nickname: "should-not-matter",
     }),
     seen.deps,
@@ -60,10 +61,9 @@ Deno.test("consent granted returns the transcript and logs latency and cost only
   });
   const response = await handleSarvamProxy(
     request("parent-token", {
-      child_profile_id: CHILD,
-      audio_base64: AUDIO_BASE64,
-      content_type: "audio/wav",
+      ...contractBody(),
       locale: "hi-IN",
+      content_type: "audio/wav",
     }),
     seen.deps,
   );
@@ -85,8 +85,46 @@ Deno.test("log line keeps latency and cost even if extra fields are passed", () 
   assertEquals(line.includes(AUDIO_TEXT), false);
 });
 
+Deno.test("NET-01 CG-06 contract body and bearer match the fixture", async () => {
+  const fixture = JSON.parse(await Deno.readTextFile(new URL("./sarvam-proxy.contract.json", import.meta.url)));
+  const required = fixture.request.body.required as string[];
+  assertEquals(required, ["child_profile_id", "audio_base64", "locale", "consent_record_id", "consent_version"]);
+  assertEquals(fixture.request.headers.Authorization.startsWith("Bearer "), true);
+  assertEquals(typeof fixture.request.headers.apikey, "string");
+  const seen = tracker({ parentId: "parent-1", consent: true, transcript: TRANSCRIPT, cost: 0.42 });
+  const ok = await handleSarvamProxy(request("parent-token", contractBody()), seen.deps);
+  assertEquals(ok.status, 200);
+  for (const key of required) {
+    const body = contractBody();
+    delete body[key];
+    const response = await handleSarvamProxy(request("parent-token", body), seen.deps);
+    assertEquals(response.status, 400);
+  }
+  const headers = new Headers({ "content-type": "application/json", authorization: "Bearer parent-token" });
+  const missingKey = await handleSarvamProxy(
+    new Request("http://127.0.0.1/functions/v1/sarvam-proxy", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(contractBody()),
+    }),
+    seen.deps,
+  );
+  assertEquals(missingKey.status, 401);
+  assertEquals(await missingKey.json(), { error: "missing_apikey" });
+});
+
+function contractBody(): Record<string, unknown> {
+  return {
+    child_profile_id: CHILD,
+    audio_base64: AUDIO_BASE64,
+    locale: "en-IN",
+    consent_record_id: CONSENT,
+    consent_version: CONSENT_VERSION,
+  };
+}
+
 function request(token: string | null, body: Record<string, unknown>): Request {
-  const headers = new Headers({ "content-type": "application/json" });
+  const headers = new Headers({ "content-type": "application/json", apikey: "anon-test" });
   if (token) headers.set("authorization", `Bearer ${token}`);
   return new Request("http://127.0.0.1/functions/v1/sarvam-proxy", {
     method: "POST",

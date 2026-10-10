@@ -1,0 +1,22 @@
+{
+  "name": "storage-purge",
+  "request": {
+    "method": "POST",
+    "path": "/functions/v1/storage-purge",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer <access token>"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["due", "retention"]
+        }
+      }
+    }
+  }
+}

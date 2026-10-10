@@ -1,0 +1,67 @@
+name: Backend
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - backend-v1
+      - "cursor/**"
+
+jobs:
+  sarvam-proxy:
+    name: sarvam-proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Test sarvam-proxy
+        working-directory: backend/supabase/functions/sarvam-proxy
+        run: deno test --deny-net --allow-read
+
+      - name: Test storage purge
+        run: |
+          if [ -f backend/supabase/functions/storage-purge/handler_test.ts ]; then
+            (cd backend/supabase/functions/storage-purge && deno test --deny-net --allow-read)
+          else
+            echo "storage-purge is not on this commit"
+          fi
+
+      - name: Check SQL migrations
+        run: |
+          python3 backend/scripts/check_migrations.py
+          python3 backend/scripts/check_deletion_sla.py
+
+  postgres-e2e:
+    name: postgres child-delete purge
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tonight
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tonight"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Child delete reaches the queue and purge
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tonight
+        run: python3 backend/scripts/postgres_e2e.py

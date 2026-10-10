@@ -412,6 +412,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.sarvam-proxy]
 verify_jwt = true
 
+[functions.storage-purge]
+verify_jwt = true
+
 [experimental.pgdelta]
 enabled = true
 # Directory under `supabase/` where declarative files are written.

@@ -54,6 +54,10 @@ export async function handleSarvamProxy(req: Request, deps: ProxyDeps): Promise<
   if (!session?.parentId) {
     return json({ error: "invalid_token" }, 401);
   }
+  const apiKey = req.headers.get("apikey")?.trim() ?? "";
+  if (!apiKey) {
+    return json({ error: "missing_apikey" }, 401);
+  }
 
   let payload: Record<string, unknown>;
   try {
@@ -74,8 +78,19 @@ export async function handleSarvamProxy(req: Request, deps: ProxyDeps): Promise<
   if (!audioBase64) {
     return json({ error: "audio_required" }, 400);
   }
+  const locale = textField(payload, "locale");
+  if (!locale) {
+    return json({ error: "locale_required" }, 400);
+  }
+  const consentRecordId = textField(payload, "consent_record_id");
+  if (!consentRecordId || !CHILD_ID.test(consentRecordId)) {
+    return json({ error: "consent_record_required" }, 400);
+  }
+  const consentVersion = textField(payload, "consent_version");
+  if (!consentVersion) {
+    return json({ error: "consent_version_required" }, 400);
+  }
   const contentType = textField(payload, "content_type") ?? "audio/wav";
-  const locale = textField(payload, "locale") ?? "unknown";
 
   let allowed = false;
   try {
