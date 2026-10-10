@@ -62,6 +62,26 @@ Before any real project is used:
 https://<project-ref>.supabase.co/functions/v1/sarvam-proxy
 ```
 
+## Deletion cron settings
+
+`storage-purge` is called by `public.invoke_storage_purge`. That function reads two values, in this order:
+
+1. Vault secrets named `supabase_url` and `service_role_key` (`vault.decrypted_secrets`).
+2. Database settings `app.settings.supabase_url` and `app.settings.service_role_key`, for a local database only. Hosted Supabase rejects `ALTER DATABASE ... SET app.settings.*`.
+
+If either value is missing, the function raises `storage-purge is not configured` and does not call the network. Set them in Vault before relying on the cron:
+
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co', 'supabase_url');
+select vault.create_secret('<service-role-key>', 'service_role_key');
+```
+
+On the hosted project the same two names can be created in the Vault UI. Do not put the service role key in the iOS app. Edge Function runtime still uses the injected `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` environment variables.
+
+Alerts (`deletion-sla-alerts`) and the purge (`storage-purge-due`) are separate cron jobs. A purge error does not roll back an alert insert.
+
+The `study-audio` bucket is gone. Queue rows use `bucket_id = 'none'`. The purge marks those rows done without listing Storage.
+
 ## Later, when the Mumbai project is created
 
 These are later steps. They are not part of local setup and they are not run from this scaffold.
