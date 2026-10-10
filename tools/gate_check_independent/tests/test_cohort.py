@@ -206,29 +206,48 @@ def test_one_unpaired_recording_rejects_the_study() -> None:
     assert "missing-apple" in caught.value.message
 
 
-def test_a_word_with_no_engine_pair_is_left_out_of_the_counts() -> None:
-    paired = study(
-        [child("c", 7, [recording("r", [agreed(True, True, 10), agreed(False, False, 1)])])]
-    )
-    with_gap = study(
+def test_g33_three_words_without_sarvam_unpair_a_recording_that_still_has_pairs() -> None:
+    """G33 / N-31. Dropping the gaps would still be APPLE, so paired words remain."""
+
+    paired_cells = [agreed(True, True, 10), agreed(False, False, 1)]
+    alone = study([child("c", 7, [recording("r", paired_cells)])])
+    assert evaluate(alone, **FAST).decision == "APPLE"
+    gaps = [
+        {"reference_correct": True, "apple_correct": True, "sarvam_correct": None, "n": 1},
+        {"reference_correct": True, "apple_correct": False, "sarvam_correct": None, "n": 1},
+        {"reference_correct": False, "apple_correct": False, "sarvam_correct": None, "n": 1},
+    ]
+    g33 = study([child("c", 7, [recording("r", paired_cells + gaps)])])
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(g33, **FAST)
+    assert caught.value.code == "UNPAIRED_RECORDING"
+    assert "r" in caught.value.message
+
+
+def test_three_word_objects_without_sarvam_unpair_the_recording() -> None:
+    payload = study(
         [
             child(
                 "c",
                 7,
                 [
-                    recording(
-                        "r",
-                        [
-                            agreed(True, True, 10),
-                            agreed(False, False, 1),
-                            {"reference_correct": True, "apple_correct": False, "sarvam_correct": None, "n": 50},
+                    {
+                        "recording_id": "r",
+                        "words": [
+                            {"reference_correct": True, "apple_correct": True, "sarvam_correct": True},
+                            {"reference_correct": False, "apple_correct": False, "sarvam_correct": False},
+                            {"reference_correct": True, "apple_correct": True, "sarvam_correct": None},
+                            {"reference_correct": True, "apple_correct": True},
+                            {"reference_correct": False, "apple_correct": False, "sarvam_correct": None},
                         ],
-                    )
+                    }
                 ],
             )
         ]
     )
-    assert evaluate(with_gap, **FAST) == evaluate(paired, **FAST)
+    with pytest.raises(GateCheckError) as caught:
+        evaluate(payload, **FAST)
+    assert caught.value.code == "UNPAIRED_RECORDING"
 
 
 def test_engine_call_that_is_not_a_boolean_or_null_is_invalid_input() -> None:

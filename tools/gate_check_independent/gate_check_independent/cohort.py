@@ -9,8 +9,10 @@ Rule 7: the expected age is class + 5, and one year either side is fine.
 Inside the cohort that warns only for class 1 with age 8, and class 3 with
 age 6. A mismatch is a warning, never a rejection.
 
-A recording whose words are not judged by both engines has no matching pair
-and is ``UNPAIRED_RECORDING``.
+A word missing either engine result is not a pair. If any word in a
+recording is missing an engine result, that recording is
+``UNPAIRED_RECORDING``, including when other words in it were judged by
+both engines.
 """
 
 from __future__ import annotations
@@ -182,10 +184,10 @@ def _parse_recording(
             f"{path} must contain exactly one of 'cells' or 'words'",
         )
     if has_cells:
-        counts, saw_pair = _counts_from_cells(body.get("cells"), f"{path}.cells")
+        counts, saw_pair, saw_gap = _counts_from_cells(body.get("cells"), f"{path}.cells")
     else:
-        counts, saw_pair = _counts_from_words(body.get("words"), f"{path}.words")
-    if not saw_pair:
+        counts, saw_pair, saw_gap = _counts_from_words(body.get("words"), f"{path}.words")
+    if saw_gap or not saw_pair:
         raise GateCheckError(
             "UNPAIRED_RECORDING",
             f"recording {recording_id} has no matching pair",
@@ -209,39 +211,49 @@ def _age_class_warning(child_id: str, age: int, school_class: int) -> str | None
     )
 
 
-def _counts_from_cells(raw: object, path: str) -> tuple[dict[tuple[bool, bool, bool], int], bool]:
+def _counts_from_cells(
+    raw: object,
+    path: str,
+) -> tuple[dict[tuple[bool, bool, bool], int], bool, bool]:
     if not isinstance(raw, list) or not raw:
         raise GateCheckError("INVALID_INPUT", f"{path} must be a non-empty list")
     counts: dict[tuple[bool, bool, bool], int] = {}
     saw_pair = False
+    saw_gap = False
     for index, item in enumerate(raw):
         cell = _object(item, f"{path}[{index}]")
         key, paired = _judged_pattern(cell, f"{path}[{index}]")
         count = _count(cell.get("n"), f"{path}[{index}].n")
         if not paired:
+            saw_gap = True
             continue
         saw_pair = True
         if key is None:
             continue
         counts[key] = counts.get(key, 0) + count
-    return counts, saw_pair
+    return counts, saw_pair, saw_gap
 
 
-def _counts_from_words(raw: object, path: str) -> tuple[dict[tuple[bool, bool, bool], int], bool]:
+def _counts_from_words(
+    raw: object,
+    path: str,
+) -> tuple[dict[tuple[bool, bool, bool], int], bool, bool]:
     if not isinstance(raw, list) or not raw:
         raise GateCheckError("INVALID_INPUT", f"{path} must be a non-empty list")
     counts: dict[tuple[bool, bool, bool], int] = {}
     saw_pair = False
+    saw_gap = False
     for index, item in enumerate(raw):
         word = _object(item, f"{path}[{index}]")
         key, paired = _judged_pattern(word, f"{path}[{index}]")
         if not paired:
+            saw_gap = True
             continue
         saw_pair = True
         if key is None:
             continue
         counts[key] = counts.get(key, 0) + 1
-    return counts, saw_pair
+    return counts, saw_pair, saw_gap
 
 
 def _judged_pattern(
@@ -250,8 +262,8 @@ def _judged_pattern(
 ) -> tuple[tuple[bool, bool, bool] | None, bool]:
     """Return ``(pattern, paired)``.
 
-    ``paired`` is false when either engine call is missing or JSON null: that
-    word is not a matching pair and is left out of the counts. A missing
+    ``paired`` is false when either engine call is missing or JSON null.
+    Any such word makes the whole recording ``UNPAIRED_RECORDING``. A missing
     ``reference_correct`` is a schema error. JSON null for the reference, with
     both engines present, is unjudged: ``paired`` is true and the pattern is
     None, so the word is excluded from agreement, false-accept, and false-reject.

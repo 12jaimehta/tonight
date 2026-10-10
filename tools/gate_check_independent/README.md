@@ -71,7 +71,7 @@ The cluster is the child. Every recording of a drawn child stays together. The s
 
 A cell is one pattern of the booleans plus a non-negative integer `n`. `reference_correct` may be `null` for an unjudged word. Duplicate judged patterns in one recording are added together. A word object is one judged or unjudged token. Both engines are judged on the same tokens.
 
-`apple_correct` or `sarvam_correct` may be missing or `null` when that engine has no result for the word. That word is not a pair and is left out of the counts. A recording that then has no word judged by both engines is `UNPAIRED_RECORDING`. The study is not scored.
+`apple_correct` or `sarvam_correct` may be missing or `null` when that engine has no result for the word. That word is not counted. If any word in a recording is missing an engine result, the recording is `UNPAIRED_RECORDING`, even when other words in it were judged by both engines. The study is not scored. An unjudged reference (`reference_correct: null`) with both engine calls present is excluded from the rates and does not unpair the recording.
 
 ```json
 {
