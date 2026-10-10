@@ -23,6 +23,13 @@
 # misc
 .DS_Store
 *.pem
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+
+# Local Supabase URL and anon key. Config.example.xcconfig stays tracked.
+ios/Config/Local.xcconfig
 
 # debug
 npm-debug.log*

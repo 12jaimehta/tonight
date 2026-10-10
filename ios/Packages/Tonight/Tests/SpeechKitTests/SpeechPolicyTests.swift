@@ -5,6 +5,11 @@ final class SpeechPolicyTests: XCTestCase {
     private let child = UUID()
     private let otherChild = UUID()
 
+    override func setUp() {
+        super.setUp()
+        installPlaceholderSpeechConfig()
+    }
+
     func testCG01_noConsent_doesNotRecord() {
         let selection = SpeechEngineSelector.select(input(record: nil))
         XCTAssertEqual(selection.engine, .none)
@@ -159,12 +164,17 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
-        XCTAssertFalse(text.localizedCaseInsensitiveContains("apiKey"))
+        assertNoVendorSecret(in: text)
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(urls.count, 1)
-        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
+        XCTAssertEqual(urls, [])
+    }
+
+    func testSpeechConfigIsInjectedInsteadOfTheAppBundle() {
+        XCTAssertNil(SupabaseSpeechConfig.load(from: Bundle(for: SpeechPolicyTests.self)))
+        XCTAssertEqual(TonightEndpoints.proxyBaseURL.host, "project-ref.supabase.co")
+        XCTAssertEqual(TonightEndpoints.anonKey, "test-anon-key")
     }
 
     func testForegroundSessionIsNotABackgroundSession() {
@@ -179,9 +189,10 @@ final class SpeechPolicyTests: XCTestCase {
         let transport = SpyTransport()
         await transport.setMode(.succeed(ProxyResponse(transcript: "the cat", words: [], latency: 0.2, cost: Decimal(string: "0.002", locale: Locale(identifier: "en_US_POSIX")))))
         let runner = makeRunner(transport: transport, sleeper: NeverSleeper())
+        let granted = record(scopes: [.onDevice, .server])
         let outcome = await runner.run(
             audio: SpeechAudio(samples: Data([1, 2, 3, 4])),
-            input: eligibleInput(record: record(scopes: [.onDevice, .server])),
+            input: eligibleInput(record: granted),
             attemptID: UUID()
         )
         XCTAssertEqual(outcome.engine, .sarvam)
@@ -190,9 +201,19 @@ final class SpeechPolicyTests: XCTestCase {
         XCTAssertEqual(posts.count, 1)
         XCTAssertEqual(posts[0].url.host, "project-ref.supabase.co")
         XCTAssertEqual(posts[0].url.path, "/functions/v1/sarvam-proxy")
+        XCTAssertEqual(posts[0].headers["Authorization"], "Bearer parent-session-token")
+        XCTAssertEqual(posts[0].headers["apikey"], "test-anon-key")
         XCTAssertNil(posts[0].headers["x-api-key"])
         XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("sarvam") })
+        XCTAssertFalse(posts[0].headers.values.contains { $0.localizedCaseInsensitiveContains("x-api-key") })
         let body = try! JSONSerialization.jsonObject(with: posts[0].body) as! [String: String]
+        XCTAssertEqual(body["child_profile_id"], granted.childProfileID.uuidString)
+        XCTAssertEqual(body["audio_base64"], Data([1, 2, 3, 4]).base64EncodedString())
+        XCTAssertEqual(body["locale"], OnDeviceRequestPolicy.localeIdentifier)
+        XCTAssertEqual(body["consent_record_id"], granted.id.uuidString)
+        XCTAssertEqual(body["consent_version"], granted.version)
+        XCTAssertNil(body["audioBase64"])
+        XCTAssertNil(body["consentRecordId"])
         XCTAssertNil(body["apiKey"])
         XCTAssertEqual(runner.callLogs.snapshot().count, 1)
     }
@@ -285,7 +306,12 @@ final class SpeechPolicyTests: XCTestCase {
         ),
         sleeper: any SpeechSleeper
     ) -> SpeechAttemptRunner {
-        SpeechAttemptRunner(transport: transport, onDevice: onDevice, sleeper: sleeper)
+        SpeechAttemptRunner(
+            transport: transport,
+            onDevice: onDevice,
+            sleeper: sleeper,
+            authorization: SpeechRequestAuthorization(accessToken: "parent-session-token", anonKey: "")
+        )
     }
 
     private func eligibleInput(
@@ -373,6 +399,24 @@ struct NeverSleeper: SpeechSleeper {
     func sleep(seconds: TimeInterval) async throws {
         try await Task.sleep(nanoseconds: 30_000_000_000)
     }
+}
+
+func installPlaceholderSpeechConfig() {
+    TonightEndpoints.use(SupabaseSpeechConfig(
+        baseURL: URL(string: "https://project-ref.supabase.co")!,
+        anonKey: "test-anon-key"
+    ))
+}
+
+private func assertNoVendorSecret(in text: String, file: StaticString = #filePath, line: UInt = #line) {
+    let withoutAnonHeader = text.replacingOccurrences(of: "\"apikey\"", with: "")
+    XCTAssertFalse(
+        withoutAnonHeader.localizedCaseInsensitiveContains("apikey"),
+        "the Supabase anon-key header is the only api key name allowed",
+        file: file,
+        line: line
+    )
+    XCTAssertFalse(text.localizedCaseInsensitiveContains("x-api-key"), file: file, line: line)
 }
 
 private func sourceText(at root: URL) throws -> String {

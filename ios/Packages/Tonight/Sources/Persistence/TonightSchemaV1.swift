@@ -95,6 +95,8 @@ public enum TonightSchemaV1: VersionedSchema {
         public var showMarkOverride: Bool?
         public var stars: Int?
         public var createdAt: Date
+        public var typingEnabled: Bool
+        public var passageSource: String?
 
         public init(
             id: UUID,
@@ -107,7 +109,9 @@ public enum TonightSchemaV1: VersionedSchema {
             photoPaths: String,
             showMarkOverride: Bool?,
             stars: Int?,
-            createdAt: Date
+            createdAt: Date,
+            typingEnabled: Bool = false,
+            passageSource: String? = nil
         ) {
             self.id = id
             self.childID = childID
@@ -120,6 +124,8 @@ public enum TonightSchemaV1: VersionedSchema {
             self.showMarkOverride = showMarkOverride
             self.stars = stars
             self.createdAt = createdAt
+            self.typingEnabled = typingEnabled
+            self.passageSource = passageSource
         }
 
         public convenience init(task: HomeworkTask) {
@@ -134,7 +140,9 @@ public enum TonightSchemaV1: VersionedSchema {
                 photoPaths: JSONText.encode(task.pagePhotoRefs.map(\.relativePath)),
                 showMarkOverride: task.showMarkOverride,
                 stars: task.stars,
-                createdAt: task.createdAt
+                createdAt: task.createdAt,
+                typingEnabled: task.typingEnabled,
+                passageSource: task.passageSource?.rawValue
             )
         }
 
@@ -152,7 +160,9 @@ public enum TonightSchemaV1: VersionedSchema {
                 media: [],
                 showMarkOverride: showMarkOverride,
                 stars: stars,
-                createdAt: createdAt
+                createdAt: createdAt,
+                typingEnabled: typingEnabled,
+                passageSource: passageSource.flatMap(ContentSourceKind.init(rawValue:))
             )
         }
     }

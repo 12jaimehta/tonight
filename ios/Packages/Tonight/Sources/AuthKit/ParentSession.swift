@@ -9,25 +9,57 @@ public struct ParentSession: Codable, Equatable, Sendable, Identifiable {
     public var parentID: String
     public var issuedAt: Date
     public var expiresAt: Date
+    /// Parent Supabase access token. The server-speech request sends it as a bearer token.
+    public var accessToken: String
 
-    public init(id: UUID = UUID(), parentID: String, issuedAt: Date, expiresAt: Date) {
+    public init(id: UUID = UUID(), parentID: String, issuedAt: Date, expiresAt: Date, accessToken: String = "") {
         self.id = id
         self.parentID = parentID
         self.issuedAt = issuedAt
         self.expiresAt = expiresAt
+        self.accessToken = accessToken
     }
 
     public static func issue(
         parentID: String,
         at date: Date,
         lifetime: TimeInterval = ParentSession.defaultLifetime,
-        id: UUID = UUID()
+        id: UUID = UUID(),
+        accessToken: String = ""
     ) -> ParentSession {
-        ParentSession(id: id, parentID: parentID, issuedAt: date, expiresAt: date.addingTimeInterval(lifetime))
+        ParentSession(
+            id: id,
+            parentID: parentID,
+            issuedAt: date,
+            expiresAt: date.addingTimeInterval(lifetime),
+            accessToken: accessToken
+        )
     }
 
     public func isValid(at date: Date) -> Bool {
         date >= issuedAt && date < expiresAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, parentID, issuedAt, expiresAt, accessToken
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(parentID, forKey: .parentID)
+        try container.encode(issuedAt, forKey: .issuedAt)
+        try container.encode(expiresAt, forKey: .expiresAt)
+        try container.encode(accessToken, forKey: .accessToken)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        parentID = try container.decode(String.self, forKey: .parentID)
+        issuedAt = try container.decode(Date.self, forKey: .issuedAt)
+        expiresAt = try container.decode(Date.self, forKey: .expiresAt)
+        accessToken = try container.decodeIfPresent(String.self, forKey: .accessToken) ?? ""
     }
 }
 

@@ -5,6 +5,11 @@ final class SpeechEngineTests: XCTestCase {
     private let child = UUID()
     private let otherChild = UUID()
 
+    override func setUp() {
+        super.setUp()
+        installPlaceholderSpeechConfig()
+    }
+
     func testCG01_noConsent_doesNotRecord() {
         let selection = SpeechEngineSelector.select(input(record: nil))
         XCTAssertEqual(selection.engine, .none)
@@ -123,12 +128,11 @@ final class SpeechEngineTests: XCTestCase {
         XCTAssertFalse(text.contains("URLSessionConfiguration.background"))
         XCTAssertFalse(text.contains("beginBackgroundTask"))
         XCTAssertFalse(text.contains("BGTaskScheduler"))
-        XCTAssertFalse(text.localizedCaseInsensitiveContains("apiKey"))
+        assertNoVendorSecret(in: text)
         XCTAssertFalse(text.contains("AVAudioFile"))
         XCTAssertTrue(text.contains("requiresOnDeviceRecognition = OnDeviceRequestPolicy.requiresOnDeviceRecognition"))
         let urls = text.split(separator: "\"").map(String.init).filter { $0.hasPrefix("https://") }
-        XCTAssertEqual(urls.count, 1)
-        XCTAssertEqual(Set(urls), ["https://project-ref.supabase.co"])
+        XCTAssertEqual(urls, [])
     }
 
     func testAudioStorageIsMemoryOnly() {
@@ -186,6 +190,43 @@ final class SpeechEngineTests: XCTestCase {
             backendConfirmed: true
         )
     }
+}
+
+final class RecordingSynthesizer: SpeechSynthesizing, @unchecked Sendable {
+    var spoken: [(text: String, rate: Float)] = []
+
+    func speak(_ text: String, rate: Float) async {
+        spoken.append((text, rate))
+    }
+
+    func stop() {}
+}
+
+final class SpokenCueTests: XCTestCase {
+    func testHearItAsksForThePassage() async {
+        let fake = RecordingSynthesizer()
+        await SpokenCue.passage("Ravi has a red kite.", using: fake)
+        XCTAssertEqual(fake.spoken.map(\.text), ["Ravi has a red kite."])
+        XCTAssertEqual(fake.spoken.map(\.rate), [IndianEnglishSpeech.passageRate])
+    }
+
+    func testHearWordAsksForTheWord() async {
+        let fake = RecordingSynthesizer()
+        await SpokenCue.word("strong", using: fake)
+        XCTAssertEqual(fake.spoken.map(\.text), ["strong"])
+        XCTAssertEqual(fake.spoken.map(\.rate), [IndianEnglishSpeech.wordRate])
+    }
+}
+
+private func assertNoVendorSecret(in text: String, file: StaticString = #filePath, line: UInt = #line) {
+    let withoutAnonHeader = text.replacingOccurrences(of: "\"apikey\"", with: "")
+    XCTAssertFalse(
+        withoutAnonHeader.localizedCaseInsensitiveContains("apikey"),
+        "the Supabase anon-key header is the only api key name allowed",
+        file: file,
+        line: line
+    )
+    XCTAssertFalse(text.localizedCaseInsensitiveContains("x-api-key"), file: file, line: line)
 }
 
 private func sourceText(at root: URL) throws -> String {

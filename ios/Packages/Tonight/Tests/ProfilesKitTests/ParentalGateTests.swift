@@ -2,37 +2,44 @@ import XCTest
 @testable import ProfilesKit
 
 final class ParentalGateTests: XCTestCase {
-    func testFixedChallengeIsTheFirstProduct() {
-        XCTAssertEqual(ParentalGateBank.challenge(fixed: true).answer, 47 * 36)
-        XCTAssertEqual(ParentalGateBank.challenges.map(\.answer), [
-            47 * 36, 86 * 27, 64 * 58, 93 * 47, 74 * 53, 39 * 68, 58 * 46, 27 * 84,
-        ])
+    func testFixedChallengeIsSpelledOut() {
+        let fixed = ParentalGateBank.challenge(fixed: true)
+        XCTAssertEqual(fixed.answer, 347)
+        XCTAssertEqual(fixed.prompt, "three hundred and forty-seven")
+        XCTAssertEqual(ParentalGateBank.challenge(fixed: true, offset: 4).prompt, fixed.prompt)
+        XCTAssertEqual(EnglishNumberWords.spell(100), "one hundred")
+        XCTAssertEqual(EnglishNumberWords.spell(101), "one hundred and one")
+        XCTAssertEqual(EnglishNumberWords.spell(111), "one hundred and eleven")
+        XCTAssertEqual(EnglishNumberWords.spell(120), "one hundred and twenty")
+        XCTAssertEqual(ParentalGateBank.number(at: 0), 100)
+        XCTAssertEqual(ParentalGateBank.challenge(fixed: false, offset: 247).answer, 347)
+        XCTAssertEqual(ParentalGateBank.digitCount, 3)
     }
 
     func testCorrectAnswerUnlocks() {
         var session = ParentalGateSession()
         let now = Date(timeIntervalSince1970: 1_000)
-        let verdict = session.submit(answer: "1692", to: ParentalGateBank.challenges[0], now: now)
+        let challenge = ParentalGateBank.challenge(fixed: true)
+        let verdict = session.submit(answer: "347", to: challenge, now: now)
         XCTAssertEqual(verdict, .unlocked)
         XCTAssertEqual(session.failures, 0)
     }
 
-    func testThreeWrongAnswersLockForSixtySeconds() {
+    func testThreeWrongAnswersCloseUntilBackground() {
         var session = ParentalGateSession()
         let now = Date(timeIntervalSince1970: 5_000)
-        let challenge = ParentalGateBank.challenges[0]
+        let challenge = ParentalGateBank.challenge(fixed: true)
         XCTAssertEqual(session.submit(answer: "1", to: challenge, now: now), .incorrect(remaining: 2))
         XCTAssertEqual(session.submit(answer: "2", to: challenge, now: now), .incorrect(remaining: 1))
         XCTAssertEqual(session.submit(answer: "3", to: challenge, now: now), .locked)
-        XCTAssertEqual(session.submit(answer: "1692", to: challenge, now: now.addingTimeInterval(30)), .locked)
-        let later = session.submit(answer: "1692", to: challenge, now: now.addingTimeInterval(60))
-        XCTAssertEqual(later, .unlocked)
+        XCTAssertEqual(session.submit(answer: "347", to: challenge, now: now.addingTimeInterval(60)), .locked)
+        XCTAssertTrue(session.isLocked(at: now.addingTimeInterval(3_600)))
     }
 
     func testBackgroundClearsTheLockout() {
         var session = ParentalGateSession()
         let now = Date()
-        let challenge = ParentalGateBank.challenges[1]
+        let challenge = ParentalGateBank.challenge(fixed: false, offset: 20)
         _ = session.submit(answer: "0", to: challenge, now: now)
         _ = session.submit(answer: "0", to: challenge, now: now)
         _ = session.submit(answer: "0", to: challenge, now: now)
@@ -40,6 +47,6 @@ final class ParentalGateTests: XCTestCase {
         session.resetForBackground()
         XCTAssertFalse(session.isLocked(at: now))
         XCTAssertEqual(session.failures, 0)
-        XCTAssertEqual(session.submit(answer: "2322", to: challenge, now: now), .unlocked)
+        XCTAssertEqual(session.submit(answer: "120", to: challenge, now: now), .unlocked)
     }
 }

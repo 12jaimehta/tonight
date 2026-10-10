@@ -11,6 +11,11 @@
 		A10000000000000000000052 /* ProfilesKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000042 /* ProfilesKit */; };
 		A10000000000000000000053 /* SpeechKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000043 /* SpeechKit */; };
 		A10000000000000000000054 /* PaywallKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000044 /* PaywallKit */; };
+		A10000000000000000000055 /* AuthKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000045 /* AuthKit */; };
+		A10000000000000000000056 /* TaskKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000046 /* TaskKit */; };
+		A10000000000000000000057 /* MarkingKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000047 /* MarkingKit */; };
+		A10000000000000000000058 /* CaptureKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000048 /* CaptureKit */; };
+		A10000000000000000000059 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000049 /* Persistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,6 +31,8 @@
 /* Begin PBXFileReference section */
 		A10000000000000000000012 /* Tonight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tonight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000013 /* TonightUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TonightUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000070 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
+		A10000000000000000000071 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -63,6 +70,11 @@
 				A10000000000000000000052 /* ProfilesKit in Frameworks */,
 				A10000000000000000000053 /* SpeechKit in Frameworks */,
 				A10000000000000000000054 /* PaywallKit in Frameworks */,
+				A10000000000000000000055 /* AuthKit in Frameworks */,
+				A10000000000000000000056 /* TaskKit in Frameworks */,
+				A10000000000000000000057 /* MarkingKit in Frameworks */,
+				A10000000000000000000058 /* CaptureKit in Frameworks */,
+				A10000000000000000000059 /* Persistence in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +91,8 @@
 		A10000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
+				A10000000000000000000070 /* Debug.xcconfig */,
+				A10000000000000000000071 /* Release.xcconfig */,
 				A10000000000000000000004 /* TonightApp */,
 				A10000000000000000000005 /* TonightUITests */,
 				A10000000000000000000003 /* Products */,
@@ -118,6 +132,11 @@
 				A10000000000000000000042 /* ProfilesKit */,
 				A10000000000000000000043 /* SpeechKit */,
 				A10000000000000000000044 /* PaywallKit */,
+				A10000000000000000000045 /* AuthKit */,
+				A10000000000000000000046 /* TaskKit */,
+				A10000000000000000000047 /* MarkingKit */,
+				A10000000000000000000048 /* CaptureKit */,
+				A10000000000000000000049 /* Persistence */,
 			);
 			productName = Tonight;
 			productReference = A10000000000000000000012 /* Tonight.app */;
@@ -273,6 +292,7 @@
 		};
 		A10000000000000000000064 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000070 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -300,6 +320,7 @@
 		};
 		A10000000000000000000065 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000071 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -434,6 +455,31 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
 			productName = PaywallKit;
+		};
+		A10000000000000000000045 /* AuthKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = AuthKit;
+		};
+		A10000000000000000000046 /* TaskKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = TaskKit;
+		};
+		A10000000000000000000047 /* MarkingKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = MarkingKit;
+		};
+		A10000000000000000000048 /* CaptureKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = CaptureKit;
+		};
+		A10000000000000000000049 /* Persistence */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000040 /* XCLocalSwiftPackageReference "Packages/Tonight" */;
+			productName = Persistence;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

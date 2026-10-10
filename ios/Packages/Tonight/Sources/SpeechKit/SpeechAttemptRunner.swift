@@ -206,13 +206,24 @@ public struct SarvamProxyConfiguration: Sendable, Equatable {
 enum SarvamRequestBody {
     static func encode(audio: SpeechAudio, locale: String, consent: AudioConsentRecord) -> Data {
         let payload: [String: String] = [
+            "child_profile_id": consent.childProfileID.uuidString,
+            "audio_base64": audio.samples.base64EncodedString(),
             "locale": locale,
-            "audioBase64": audio.samples.base64EncodedString(),
-            "contentType": "audio/wav",
-            "consentRecordId": consent.id.uuidString,
-            "consentVersion": consent.version,
+            "consent_record_id": consent.id.uuidString,
+            "consent_version": consent.version,
         ]
         return try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    }
+}
+
+/// Parent session access token and the Supabase anon key. Neither value is a Sarvam secret.
+public struct SpeechRequestAuthorization: Sendable, Equatable {
+    public var accessToken: String
+    public var anonKey: String
+
+    public init(accessToken: String, anonKey: String) {
+        self.accessToken = accessToken
+        self.anonKey = anonKey
     }
 }
 
@@ -222,6 +233,7 @@ public struct SpeechAttemptRunner: Sendable {
     public var sleeper: any SpeechSleeper
     public var audit: SpeechAuditLog
     public var callLogs: CallLogStore
+    public var authorization: SpeechRequestAuthorization
     public var now: @Sendable () -> Date
 
     public init(
@@ -230,6 +242,7 @@ public struct SpeechAttemptRunner: Sendable {
         sleeper: any SpeechSleeper = TaskSpeechSleeper(),
         audit: SpeechAuditLog = SpeechAuditLog(),
         callLogs: CallLogStore = CallLogStore(),
+        authorization: SpeechRequestAuthorization = SpeechRequestAuthorization(accessToken: "", anonKey: ""),
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.transport = transport
@@ -237,6 +250,7 @@ public struct SpeechAttemptRunner: Sendable {
         self.sleeper = sleeper
         self.audit = audit
         self.callLogs = callLogs
+        self.authorization = authorization
         self.now = now
     }
 
@@ -286,10 +300,15 @@ public struct SpeechAttemptRunner: Sendable {
             return await fallbackOnDevice(audio: audio, input: input, attemptID: attemptID, locale: locale, reason: .serverError, bytesSent: 0)
         }
         let body = SarvamRequestBody.encode(audio: audio, locale: locale, consent: record)
+        let anonKey = authorization.anonKey.isEmpty ? TonightEndpoints.anonKey : authorization.anonKey
         let request = ProxyRequest(
             url: url,
             body: body,
-            headers: ["Content-Type": "application/json"],
+            headers: [
+                "Content-Type": "application/json",
+                "Authorization": "Bearer \(authorization.accessToken)",
+                "apikey": anonKey,
+            ],
             timeout: OnDeviceRequestPolicy.serverTimeout
         )
         let post = Task { try await transport.post(request) }

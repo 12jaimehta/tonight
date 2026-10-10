@@ -83,6 +83,49 @@ final class StarTests: XCTestCase {
         )
     }
 
+    func testTypedReadingCapsAtOneStarAndSpokenKeepsTheScale() {
+        XCTAssertEqual(EnglishStars.count(percent: 100, inputMode: .spoken), 3)
+        XCTAssertEqual(EnglishStars.count(percent: 90, inputMode: .spoken), 3)
+        XCTAssertEqual(EnglishStars.count(percent: 89, inputMode: .spoken), 2)
+        XCTAssertEqual(EnglishStars.count(percent: 60, inputMode: .spoken), 2)
+        XCTAssertEqual(EnglishStars.count(percent: 59, inputMode: .spoken), 1)
+        XCTAssertEqual(EnglishStars.count(percent: 0, inputMode: .spoken), 1)
+        for percent in [0, 59, 60, 89, 90, 100] {
+            XCTAssertEqual(EnglishStars.count(percent: percent, inputMode: .typed), 1)
+        }
+
+        let marker = Marker()
+        let perfect = marker.mark(expected: "one two three", heard: "one two three")
+        XCTAssertEqual(perfect.percent, 100)
+        XCTAssertEqual(EnglishStars.count(for: perfect, inputMode: .spoken), 3)
+        XCTAssertEqual(EnglishStars.count(for: perfect, inputMode: .typed), 1)
+        XCTAssertEqual(
+            StarDisplay.automatic(percent: 100, markVisible: true, parentReviewed: false, inputMode: .typed),
+            .shown(1)
+        )
+        XCTAssertEqual(
+            StarDisplay.automatic(percent: 100, markVisible: true, parentReviewed: false, inputMode: .spoken),
+            .shown(3)
+        )
+        XCTAssertEqual(NotebookStars.count(picked: 1), 1)
+        XCTAssertEqual(NotebookStars.count(picked: 2), 2)
+        XCTAssertEqual(NotebookStars.count(picked: 3), 3)
+        XCTAssertEqual(ReadingAttemptLabel.typedNotReadAloud, "Typed, not read aloud")
+    }
+
+    func testTypedAttemptsStayOutOfAccuracyAndHistory() {
+        let samples = [
+            ReadingSample(inputMode: .spoken, percent: 50),
+            ReadingSample(inputMode: .typed, percent: 100),
+            ReadingSample(inputMode: .spoken, percent: 90),
+        ]
+        XCTAssertEqual(ReadingHistory.accuracy(of: samples), 70)
+        XCTAssertEqual(ReadingHistory.trend(of: samples), [50, 90])
+        XCTAssertNil(ReadingHistory.accuracy(of: [ReadingSample(inputMode: .typed, percent: 100)]))
+        XCTAssertEqual(ReadingHistory.trend(of: [ReadingSample(inputMode: .typed, percent: 100)]), [])
+        XCTAssertEqual(ReadingHistory.sample(inputMode: .typed, percent: nil), nil)
+    }
+
     func testAStarCountDoesNotCarryStreakXPOrLevel() throws {
         let award = try JSONSerialization.jsonObject(
             with: JSONEncoder().encode(StarCount(count: 2))

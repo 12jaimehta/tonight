@@ -43,8 +43,8 @@ let package = Package(
         .target(name: "CaptureKit"),
         .testTarget(name: "CaptureKitTests", dependencies: ["CaptureKit"]),
 
-        .target(name: "PracticeKit"),
-        .testTarget(name: "PracticeKitTests", dependencies: ["PracticeKit"]),
+        .target(name: "PracticeKit", dependencies: ["MarkingKit"]),
+        .testTarget(name: "PracticeKitTests", dependencies: ["PracticeKit", "MarkingKit"]),
 
         .target(name: "PaywallKit"),
         .testTarget(name: "PaywallKitTests", dependencies: ["PaywallKit"]),
@@ -55,7 +55,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PersistenceTests",
-            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit"]
+            dependencies: ["Persistence", "ProfilesKit", "TaskKit", "PracticeKit", "AuthKit", "CaptureKit"]
         ),
 
         .target(name: "Telemetry"),
