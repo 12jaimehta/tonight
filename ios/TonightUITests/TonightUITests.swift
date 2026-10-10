@@ -191,10 +191,14 @@ final class TonightUITests: XCTestCase {
         app.buttons["today.settings"].tap()
         XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
         tapDigits(["3", "4", "7"], in: app)
-        XCTAssertTrue(app.staticTexts["remember 1 marks 1 audio 1"].waitForExistence(timeout: 5))
+        let before = app.staticTexts["withdrawal.local"]
+        XCTAssertTrue(before.waitForExistence(timeout: 5))
+        XCTAssertEqual(before.label, "remember 1 marks 1 audio 1")
         app.buttons["consent.withdraw"].tap()
         app.buttons["consent.withdraw.confirm"].tap()
-        XCTAssertTrue(app.staticTexts["remember 0 marks 0 audio 0"].waitForExistence(timeout: 5))
+        let after = app.staticTexts["withdrawal.local"]
+        XCTAssertTrue(after.waitForExistence(timeout: 5))
+        XCTAssertEqual(after.label, "remember 0 marks 0 audio 0")
     }
 
     func test_CG32_withdrawConsentConfirmsBehindTheGate() {

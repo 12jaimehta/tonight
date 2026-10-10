@@ -56,14 +56,14 @@ public final class SpeechLedger: @unchecked Sendable {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appendingPathComponent(filename)
         try data.write(to: url, options: [.atomic])
-        try FileManager.default.setAttributes(
+        try? FileManager.default.setAttributes(
             [.protectionKey: FileProtectionType.completeUnlessOpen],
             ofItemAtPath: url.path
         )
         var excluded = url
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
-        try excluded.setResourceValues(values)
+        try? excluded.setResourceValues(values)
         let artefact = LedgerArtefact(
             id: id,
             childProfileID: childProfileID,
@@ -281,7 +281,7 @@ public final class SpeechLedger: @unchecked Sendable {
         let url = directory.appendingPathComponent("ledger.json")
         let data = try encoder.encode(file)
         try data.write(to: url, options: [.atomic])
-        try FileManager.default.setAttributes(
+        try? FileManager.default.setAttributes(
             [.protectionKey: FileProtectionType.completeUnlessOpen],
             ofItemAtPath: url.path
         )
