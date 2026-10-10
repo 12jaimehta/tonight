@@ -53,7 +53,9 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(agree.waitForExistence(timeout: 5))
         XCTAssertFalse(agree.isEnabled)
         app.buttons["consent.accept"].tap()
-        XCTAssertTrue(agree.isEnabled)
+        let enabled = NSPredicate(format: "isEnabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: enabled, object: agree)
+        XCTAssertEqual(XCTWaiter().wait(for: [expectation], timeout: 5), .completed)
         agree.tap()
         XCTAssertTrue(app.staticTexts["Add a child"].waitForExistence(timeout: 5))
     }
