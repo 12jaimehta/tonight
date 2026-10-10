@@ -20,7 +20,7 @@ The app target is iOS 17 or newer, iPhone, portrait only. Bundle id `com.tonight
 | SpeechKit | On-device recognition, consent, and the study-only server adapter |
 | MarkingKit | Word alignment, answer scoring, and star counts derived from a mark |
 | PracticeKit | Remember list. Two different correct days clear a word. Warmup is capped at 5. |
-| PaywallKit | Trial of 7 nights, monthly 149 INR, annual cap 1499 INR. Flag off. Parental gate required. No store network. |
+| PaywallKit | 7-night trial on the annual plan only, monthly 149 INR, annual 999 INR. No trial on the monthly plan. Family Sharing is off. Flag off. Parental gate required. No store network. |
 | Persistence | SwiftData schema V1, empty migration plan, `FileProtectionType.complete`. Photos are excluded from backup. `PhotoAccess` requires the parent unlock. |
 | Telemetry | First-party event names only. No free text and no third-party SDK. |
 
@@ -48,3 +48,17 @@ App and UI tests:
 cd ios
 xcodebuild test -workspace Tonight.xcworkspace -scheme Tonight -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO
 ```
+
+## Run on a personal iPhone
+
+The app is signed with a free Apple ID (Personal Team). The project leaves `DEVELOPMENT_TEAM` empty so Xcode can fill in that team on your Mac.
+
+1. Open `Tonight.xcworkspace`, select the Tonight target, and open Signing & Capabilities.
+2. Set Team to your Personal Team.
+3. If the bundle id `com.tonight.homework` is already taken, change it to one that belongs to you, such as `com.yourname.tonight`.
+4. Connect the iPhone, choose it as the run destination, and run Tonight.
+5. On the iPhone, open Settings → General → VPN & Device Management, trust the developer certificate, and open Tonight.
+
+A Personal Team provisioning profile expires after 7 days. Run the app from Xcode again when it expires. A Personal Team can register up to 3 devices.
+
+Sign in with Apple, push, and iCloud are off because they need a paid Apple Developer Program. Email OTP is the sign-in on screen. Local purchase testing uses `Tonight.storekit` on the Tonight scheme: ₹149 a month with no trial, and ₹999 a year with a 7-day free trial. Family Sharing is off, and the configuration does not contact the App Store.
