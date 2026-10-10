@@ -28,7 +28,7 @@ jobs:
       - name: Test storage purge
         run: |
           if [ -f backend/supabase/functions/storage-purge/handler_test.ts ]; then
-            (cd backend/supabase/functions/storage-purge && deno test --deny-net)
+            (cd backend/supabase/functions/storage-purge && deno test --deny-net --allow-read)
           else
             echo "storage-purge is not on this commit"
           fi

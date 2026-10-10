@@ -1,4 +1,4 @@
-import { createStorageClient, purgeDue, type DeletionQueueRow, type StorageObject } from "./handler.ts";
+import { createStorageClient, handleStoragePurge, purgeDue, type DeletionQueueRow, type StorageObject } from "./handler.ts";
 
 Deno.test("DEL-06 DEL-16 storage remove then an empty list marks the row done", async () => {
   const removed: string[][] = [];
@@ -67,6 +67,39 @@ Deno.test("DEL-06 the client calls the Storage API and not a SQL delete", async 
   assertEquals(calls[1].body.includes("parent/child/clip.wav"), true);
   assertEquals(listed, true);
   assertEquals(JSON.stringify(calls).includes("delete from storage.objects"), false);
+});
+
+Deno.test("DEL-11 a scheduled POST runs the due purge", async () => {
+  const calls: string[] = [];
+  const response = await handleStoragePurge(
+    new Request("https://project-ref.supabase.co/functions/v1/storage-purge", {
+      method: "POST",
+      headers: { authorization: "Bearer service-role", "content-type": "application/json" },
+      body: JSON.stringify({ mode: "due" }),
+    }),
+    {
+      purgeDue: async () => {
+        calls.push("due");
+        return { deletedIds: ["queue-1"], remaining: [] };
+      },
+    },
+  );
+  assertEquals(response.status, 200);
+  assertEquals(calls, ["due"]);
+  const missing = await handleStoragePurge(
+    new Request("https://project-ref.supabase.co/functions/v1/storage-purge", { method: "POST" }),
+    { purgeDue: async () => ({ deletedIds: [], remaining: [] }) },
+  );
+  assertEquals(missing.status, 401);
+});
+
+Deno.test("DEL-21 the migration alerts on unfinished rows", async () => {
+  const url = new URL("../../migrations/20261010130500_schedule_storage_purge.sql", import.meta.url);
+  const sql = await Deno.readTextFile(url);
+  assertEquals(sql.includes("deleted_at is null"), true);
+  assertEquals(sql.includes("> interval '24 hours'"), true);
+  assertEquals(sql.includes("invoke_storage_purge"), true);
+  assertEquals(sql.includes("functions/v1/storage-purge"), true);
 });
 
 function row(): DeletionQueueRow {

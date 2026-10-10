@@ -25,6 +25,37 @@ export type PurgeResult = {
   remaining: string[];
 };
 
+export async function handleStoragePurge(
+  req: Request,
+  deps: {
+    purgeDue: () => Promise<PurgeResult>;
+    purgeRetention?: () => Promise<{ removed: string[] }>;
+  },
+): Promise<Response> {
+  if (req.method !== "POST") {
+    return json({ error: "method_not_allowed" }, 405);
+  }
+  const header = req.headers.get("authorization") ?? "";
+  if (!/^Bearer\s+\S+/.test(header)) {
+    return json({ error: "missing_token" }, 401);
+  }
+  let mode = "due";
+  const text = await req.text();
+  if (text.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(text) as { mode?: unknown };
+      if (parsed && parsed.mode === "retention") mode = "retention";
+    } catch {
+      return json({ error: "invalid_json" }, 400);
+    }
+  }
+  if (mode === "retention") {
+    if (!deps.purgeRetention) return json({ error: "retention_unavailable" }, 500);
+    return json(await deps.purgeRetention(), 200);
+  }
+  return json(await deps.purgeDue(), 200);
+}
+
 export async function purgeDue(deps: PurgeDeps): Promise<PurgeResult> {
   const deletedIds: string[] = [];
   const remaining: string[] = [];
@@ -42,6 +73,13 @@ export async function purgeDue(deps: PurgeDeps): Promise<PurgeResult> {
     deletedIds.push(row.id);
   }
   return { deletedIds, remaining };
+}
+
+function json(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;

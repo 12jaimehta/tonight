@@ -32,6 +32,19 @@ def main() -> None:
     purge = latest_function(combined, "purge_due_study_audio")
     if "delete from storage.objects" in purge.lower():
         raise SystemExit("purge_due_study_audio still deletes storage metadata in SQL")
+    if "invoke_storage_purge" not in purge:
+        raise SystemExit("DEL-11 purge_due_study_audio does not call storage-purge")
+    if "raise notice" in purge.lower():
+        raise SystemExit("DEL-11 purge_due_study_audio is still a no-op notice")
+    alerts = latest_function(combined, "raise_deletion_sla_alerts")
+    if "deleted_at is null" not in alerts:
+        raise SystemExit("DEL-21 stuck or failed deletions do not raise an alert")
+    if "> interval '24 hours'" not in alerts:
+        raise SystemExit("DEL-21 alert is missing the 24 hour comparison")
+    entry = pathlib.Path(__file__).resolve().parents[1] / "supabase" / "functions" / "storage-purge" / "index.ts"
+    entry_text = entry.read_text(encoding="utf-8")
+    if "Deno.serve" not in entry_text or "handleStoragePurge" not in entry_text:
+        raise SystemExit("DEL-11 storage-purge has no entry point")
     bucket = (root / "20261010130200_drop_study_audio_bucket.sql").read_text(encoding="utf-8").lower()
     for policy in (
         "study_audio_owner_select",
