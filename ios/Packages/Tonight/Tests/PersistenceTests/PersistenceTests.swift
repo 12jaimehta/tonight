@@ -94,6 +94,20 @@ final class PersistenceTests: XCTestCase {
         }
     }
 
+    func test_PRIV18_PRIV20_DEL12_storeDirectoryIsExcludedBeforeOpen() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = directory.appendingPathComponent("Tonight.store")
+        _ = try TonightStore.makeContainer(at: storeURL)
+        XCTAssertTrue(try PhotoFilePolicy.isExcludedFromBackup(directory))
+        let attributes = try FileManager.default.attributesOfItem(atPath: directory.path)
+        let protection = attributes[.protectionKey] as? FileProtectionType
+        if ProcessInfo.processInfo.environment["SIMULATOR_UDID"] != nil {
+            XCTAssertTrue(protection == nil || protection == .completeUnlessOpen)
+        } else {
+            XCTAssertEqual(protection, .completeUnlessOpen)
+        }
+    }
+
     func testPhotosAreExcludedFromBackupAndNeedTheParent() throws {
         XCTAssertEqual(LocalProtection.fileProtection, .complete)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

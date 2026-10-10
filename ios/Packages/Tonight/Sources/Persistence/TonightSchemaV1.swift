@@ -393,6 +393,7 @@ public enum TonightMigrationPlan: SchemaMigrationPlan {
 
 public enum TonightStore {
     public static func makeContainer(at url: URL) throws -> ModelContainer {
+        try LocalProtection.prepareStoreDirectory(url.deletingLastPathComponent())
         let schema = Schema(versionedSchema: TonightSchemaV1.self)
         let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
         let container = try ModelContainer(
