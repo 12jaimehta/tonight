@@ -491,7 +491,14 @@ final class TonightModel {
         guard let child, let consentCenter else { return }
         try? consentCenter.ledger.addRememberWord("kite", childProfileID: child.id)
         try? consentCenter.ledger.addMarkCorrection("star", childProfileID: child.id)
-        _ = try? consentCenter.ledger.storeAudio(Data([1, 2, 3]), childProfileID: child.id, serverPath: false)
+        if (try? consentCenter.ledger.storeAudio(Data([1, 2, 3]), childProfileID: child.id, serverPath: false)) == nil {
+            _ = try? consentCenter.ledger.storeText("clip", childProfileID: child.id, kind: .audio, serverPath: false)
+        }
+    }
+
+    private func activeConsent(for childID: UUID) -> AudioConsentRecord? {
+        guard let record = consentCenter?.record(for: childID), record.withdrawnAt == nil else { return nil }
+        return record
     }
 
     private func localInventory(_ childID: UUID) -> String {
@@ -716,7 +723,7 @@ final class TonightModel {
                 confirmingWithdrawal = false
                 withdrawalNotice = ""
                 let childID = child?.id ?? today.selected?.id
-                withdrawalHasConsent = childID.flatMap { consentCenter?.record(for: $0) } != nil
+                withdrawalHasConsent = childID.flatMap { activeConsent(for: $0) } != nil
                 withdrawalLocal = childID.map(localInventory) ?? ""
                 showingWithdrawal = true
             case .parentCheck:
@@ -757,13 +764,12 @@ final class TonightModel {
             return
         }
         do {
-            let existing = consentCenter.record(for: childID)
-            guard existing != nil else {
+            guard let existing = activeConsent(for: childID) else {
                 withdrawalHasConsent = false
                 withdrawalNotice = "No consent on file"
                 return
             }
-            let consentID = existing?.id
+            let consentID = existing.id
             _ = try await consentCenter.withdraw(childProfileID: childID, at: Date())
             await serverWithdrawal?.submit(childID: childID, consentRecordID: consentID)
             withdrawalLocal = localInventory(childID)

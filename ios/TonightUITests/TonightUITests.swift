@@ -189,6 +189,7 @@ final class TonightUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
         tapDigits(["3", "4", "7"], in: app)
         app.buttons["today.settings"].tap()
+        XCTAssertTrue(app.staticTexts["three hundred and forty-seven"].waitForExistence(timeout: 5))
         tapDigits(["3", "4", "7"], in: app)
         XCTAssertTrue(app.staticTexts["remember 1 marks 1 audio 1"].waitForExistence(timeout: 5))
         app.buttons["consent.withdraw"].tap()
