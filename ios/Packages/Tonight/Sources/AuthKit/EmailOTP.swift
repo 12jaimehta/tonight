@@ -196,10 +196,16 @@ public struct EmailOTPClient: Sendable {
         let user = object?["user"] as? [String: Any]
         let parentID = user?["id"] as? String
         guard let token, !token.isEmpty, let parentID, !parentID.isEmpty else { throw EmailOTPError.malformed }
-        let lifetime = (object?["expires_in"] as? Int).map(TimeInterval.init) ?? (object?["expires_in"] as? Double).map(TimeInterval.init) ?? 3600
+        let lifetime = Self.lifetime(from: object?["expires_in"])
         guard lifetime > 0 else { throw EmailOTPError.malformed }
         _ = issuedAt
         return (parentID, token, lifetime)
+    }
+
+    private static func lifetime(from value: Any?) -> TimeInterval {
+        if let seconds = value as? Int { return TimeInterval(seconds) }
+        if let seconds = value as? Double { return seconds }
+        return 3600
     }
 }
 
