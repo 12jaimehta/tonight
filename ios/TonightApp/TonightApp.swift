@@ -82,7 +82,9 @@ enum TonightComposition {
             },
             baseURL: config.baseURL,
             anonKey: config.anonKey,
-            accessToken: ""
+            accessToken: {
+                (try? KeychainAccessTokenStore().load()) ?? ""
+            }
         )
     }
 }

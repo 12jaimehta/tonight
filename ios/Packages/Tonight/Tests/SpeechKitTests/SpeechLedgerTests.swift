@@ -196,8 +196,96 @@ final class SpeechLedgerTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer parent-token")
         XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "anon-test")
         let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: String]
-        XCTAssertEqual(body?["child_profile_id"], child.uuidString)
-        XCTAssertEqual(body?["object_prefix"], "\(child.uuidString)/")
+        XCTAssertEqual(body, ["mode": "due"])
+        XCTAssertNil(body?["child_profile_id"])
+        XCTAssertNil(body?["object_prefix"])
+    }
+
+    func test_N12_deletionCallMatchesTheSharedContract() async throws {
+        let contractURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("backend/supabase/functions/storage-purge/storage-purge.contract.json")
+        let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: contractURL)) as? [String: Any]
+        XCTAssertEqual(fixture?["name"] as? String, "storage-purge")
+        let requestSpec = try XCTUnwrap(fixture?["request"] as? [String: Any])
+        XCTAssertEqual(requestSpec["method"] as? String, "POST")
+        XCTAssertEqual(requestSpec["path"] as? String, "/functions/v1/storage-purge")
+        let headerSpec = try XCTUnwrap(requestSpec["headers"] as? [String: String])
+        XCTAssertTrue(headerSpec["Authorization"]?.hasPrefix("Bearer ") == true)
+        let bodySpec = try XCTUnwrap(requestSpec["body"] as? [String: Any])
+        let required = try XCTUnwrap(bodySpec["required"] as? [String])
+        XCTAssertEqual(required, ["mode"])
+        let properties = try XCTUnwrap(bodySpec["properties"] as? [String: Any])
+        let mode = try XCTUnwrap(properties["mode"] as? [String: Any])
+        let allowed = try XCTUnwrap(mode["enum"] as? [String])
+        XCTAssertEqual(allowed, ["due", "retention"])
+
+        let host = URL(string: "https://project-ref.supabase.co")!
+        TonightEndpoints.use(SupabaseSpeechConfig(baseURL: host, anonKey: "anon-test"))
+        let captured = OSAllocatedUnfairLock<URLRequest?>(initialState: nil)
+        let sender = HostDeletionSender(
+            post: { request in captured.withLock { $0 = request } },
+            baseURL: host,
+            anonKey: "anon-test",
+            accessToken: "parent-access-token"
+        )
+        let child = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+        try await sender.send(ServerDeletionJob(
+            id: UUID(),
+            childProfileID: child,
+            prefix: "\(child.uuidString)/",
+            enqueuedAt: Date(timeIntervalSince1970: 10),
+            attempts: 0,
+            nextAttemptAt: Date(timeIntervalSince1970: 10),
+            completedAt: nil
+        ))
+        let request = try XCTUnwrap(captured.withLock { $0 })
+        XCTAssertEqual(request.httpMethod, requestSpec["method"] as? String)
+        XCTAssertEqual(request.url?.path, requestSpec["path"] as? String)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer parent-access-token")
+        XCTAssertFalse(request.value(forHTTPHeaderField: "Authorization") == "Bearer ")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: String]
+        XCTAssertEqual(Set(body?.keys ?? []), Set(required))
+        XCTAssertTrue(allowed.contains(body?["mode"] ?? ""))
+        XCTAssertEqual(body?["mode"], HostDeletionSender.dueMode)
+
+        let empty = HostDeletionSender(
+            post: { _ in },
+            baseURL: host,
+            anonKey: "anon-test",
+            accessToken: ""
+        )
+        do {
+            try await empty.send(ServerDeletionJob(
+                id: UUID(),
+                childProfileID: child,
+                prefix: "\(child.uuidString)/",
+                enqueuedAt: Date(),
+                attempts: 0,
+                nextAttemptAt: Date(),
+                completedAt: nil
+            ))
+            XCTFail("an empty access token must not be sent")
+        } catch DeletionSendError.notConfigured {
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+
+        let app = contractURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("ios/TonightApp/TonightApp.swift")
+        let source = try String(contentsOf: app, encoding: .utf8)
+        XCTAssertTrue(source.contains("KeychainAccessTokenStore().load()"))
+        XCTAssertFalse(source.contains("accessToken: \"\""))
     }
 
     private func makeDirectory() throws -> URL {

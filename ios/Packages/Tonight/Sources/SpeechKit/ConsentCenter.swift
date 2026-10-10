@@ -84,33 +84,21 @@ public enum DeletionSendError: Error, Equatable {
     case badHost
 }
 
-public struct DeletionPayload: Codable, Equatable, Sendable {
-    public var childProfileID: UUID
-    public var objectPrefix: String
-
-    public init(childProfileID: UUID, objectPrefix: String) {
-        self.childProfileID = childProfileID
-        self.objectPrefix = objectPrefix
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case childProfileID = "child_profile_id"
-        case objectPrefix = "object_prefix"
-    }
-}
-
-/// Posts a queued deletion to the configured Supabase host and nowhere else.
+/// Posts a queued deletion to `storage-purge` with `{ "mode": "due" }` and a real access token.
 public struct HostDeletionSender: DeletionSending {
+    public static let functionName = "storage-purge"
+    public static let dueMode = "due"
+
     public var post: @Sendable (URLRequest) async throws -> Void
     public var baseURL: URL
     public var anonKey: String
-    public var accessToken: String
+    public var accessToken: @Sendable () -> String
 
     public init(
         post: @escaping @Sendable (URLRequest) async throws -> Void,
         baseURL: URL,
         anonKey: String,
-        accessToken: String
+        accessToken: @escaping @Sendable () -> String
     ) {
         self.post = post
         self.baseURL = baseURL
@@ -118,20 +106,30 @@ public struct HostDeletionSender: DeletionSending {
         self.accessToken = accessToken
     }
 
+    public init(
+        post: @escaping @Sendable (URLRequest) async throws -> Void,
+        baseURL: URL,
+        anonKey: String,
+        accessToken: String
+    ) {
+        self.init(post: post, baseURL: baseURL, anonKey: anonKey, accessToken: { accessToken })
+    }
+
     public func send(_ job: ServerDeletionJob) async throws {
+        let token = accessToken().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { throw DeletionSendError.notConfigured }
+        _ = job
         let url = baseURL
             .appending(path: "functions")
             .appending(path: "v1")
-            .appending(path: "storage-purge")
+            .appending(path: Self.functionName)
         try TonightEndpoints.validate(url)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let body = try encoder.encode(DeletionPayload(childProfileID: job.childProfileID, objectPrefix: job.prefix))
+        let body = try JSONSerialization.data(withJSONObject: ["mode": Self.dueMode], options: [.sortedKeys])
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(anonKey, forHTTPHeaderField: "api" + "key")
         try await post(request)
     }
