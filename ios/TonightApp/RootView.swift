@@ -1,6 +1,7 @@
 import DesignSystem
 import PaywallKit
 import ProfilesKit
+import SpeechKit
 import SwiftUI
 
 struct RootView: View {
@@ -10,6 +11,12 @@ struct RootView: View {
     @State private var unlocked = false
     @State private var answer = ""
     @State private var notice = ""
+    @State private var uploadStatus = ""
+    @State private var speechScene = SpeechSceneController(runner: TonightSpeechScene.makeRunner())
+
+    private var stubUpload: Bool {
+        ProcessInfo.processInfo.arguments.contains("-TonightStubUpload")
+    }
 
     private var fixedGate: Bool {
         ProcessInfo.processInfo.arguments.contains("-TonightFixedGate")
@@ -32,16 +39,23 @@ struct RootView: View {
                     onClose: closeParent
                 )
             } else {
-                ChildHomeView(onParent: { showingParent = true })
+                ChildHomeView(onParent: { showingParent = true }, uploadStatus: uploadStatus)
             }
         }
         .onChange(of: scenePhase) { _, phase in
+            guard phase != .active else { return }
+            if stubUpload { uploadStatus = "Suspended" }
+            Task { await speechScene.sceneDidChange(isActive: false) }
             guard phase == .background else { return }
             gate.resetForBackground()
             unlocked = false
             showingParent = false
             answer = ""
             notice = ""
+        }
+        .onAppear {
+            guard stubUpload else { return }
+            uploadStatus = "Uploading"
         }
     }
 
@@ -66,6 +80,7 @@ struct RootView: View {
 
 struct ChildHomeView: View {
     var onParent: () -> Void
+    var uploadStatus: String = ""
 
     private var subjects: [SubjectRecord] {
         SubjectCatalog.defaults(for: AudienceConfig.v1.classes[0])
@@ -85,6 +100,10 @@ struct ChildHomeView: View {
                 Button("Parent", action: onParent)
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("parent.button")
+                if !uploadStatus.isEmpty {
+                    Text(uploadStatus)
+                        .accessibilityIdentifier("speech.status")
+                }
             }
             .padding(24)
         }

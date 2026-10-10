@@ -36,6 +36,17 @@ final class TonightUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Parent area"].exists)
     }
 
+    func test_CG33_LAT10_backgroundThreeSecondsIntoAStubbedUpload() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-TonightStubUpload"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Uploading"].waitForExistence(timeout: 8))
+        Thread.sleep(forTimeInterval: 3)
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.staticTexts["Suspended"].waitForExistence(timeout: 8))
+    }
+
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-TonightFixedGate"]
