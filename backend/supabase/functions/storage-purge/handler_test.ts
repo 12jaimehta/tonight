@@ -81,7 +81,7 @@ Deno.test("DEL-11 a scheduled POST runs the due purge", async () => {
   const response = await handleStoragePurge(
     new Request("https://project-ref.supabase.co/functions/v1/storage-purge", {
       method: "POST",
-      headers: { authorization: "Bearer service-role", "content-type": "application/json" },
+      headers: { authorization: bearer("service_role"), "content-type": "application/json" },
       body: JSON.stringify({ mode: "due" }),
     }),
     {
@@ -228,6 +228,50 @@ Deno.test("DEL-11 DEL-21 child delete reaches the queue and purge finishes befor
   assertEquals(unfinished, []);
 });
 
+Deno.test("N-22 storage-purge accepts only the service role", async () => {
+  let calls = 0;
+  const deps = {
+    purgeDue: async () => {
+      calls += 1;
+      return { deletedIds: [], remaining: [] };
+    },
+  };
+  const url = "https://project-ref.supabase.co/functions/v1/storage-purge";
+  const body = JSON.stringify({ mode: "due" });
+  const allowed = await handleStoragePurge(
+    new Request(url, {
+      method: "POST",
+      headers: { authorization: bearer("service_role"), "content-type": "application/json" },
+      body,
+    }),
+    deps,
+  );
+  assertEquals(allowed.status, 200);
+  assertEquals(calls, 1);
+
+  const anon = await handleStoragePurge(
+    new Request(url, {
+      method: "POST",
+      headers: { authorization: bearer("anon"), "content-type": "application/json" },
+      body,
+    }),
+    deps,
+  );
+  assertEquals(anon.status, 403);
+  assertEquals(calls, 1);
+
+  const user = await handleStoragePurge(
+    new Request(url, {
+      method: "POST",
+      headers: { authorization: bearer("authenticated"), "content-type": "application/json" },
+      body,
+    }),
+    deps,
+  );
+  assertEquals(user.status, 403);
+  assertEquals(calls, 1);
+});
+
 Deno.test("N-12 storage-purge request matches the shared contract", async () => {
   const fixture = JSON.parse(
     await Deno.readTextFile(new URL("./storage-purge.contract.json", import.meta.url)),
@@ -240,7 +284,7 @@ Deno.test("N-12 storage-purge request matches the shared contract", async () => 
   const response = await handleStoragePurge(
     new Request("https://project-ref.supabase.co/functions/v1/storage-purge", {
       method: fixture.request.method,
-      headers: { authorization: "Bearer service-role", "content-type": "application/json" },
+      headers: { authorization: bearer("service_role"), "content-type": "application/json" },
       body: JSON.stringify({ mode: "due" }),
     }),
     { purgeDue: async () => ({ deletedIds: ["queue-1"], remaining: [] }) },
@@ -264,6 +308,16 @@ Deno.test("DEL-21 the migration alerts on unfinished rows", async () => {
   assertEquals(sql.includes("invoke_storage_purge"), true);
   assertEquals(sql.includes("functions/v1/storage-purge"), true);
 });
+
+function bearer(role: string): string {
+  const header = base64url(JSON.stringify({ alg: "none", typ: "JWT" }));
+  const payload = base64url(JSON.stringify({ role, sub: "00000000-0000-0000-0000-000000000001" }));
+  return `Bearer ${header}.${payload}.test-signature`;
+}
+
+function base64url(text: string): string {
+  return btoa(text).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
 
 function row(): DeletionQueueRow {
   return { id: "queue-1", bucketId: "kept-audio", objectPrefix: "parent/child/" };

@@ -38,9 +38,12 @@ export async function handleStoragePurge(
   if (req.method !== "POST") {
     return json({ error: "method_not_allowed" }, 405);
   }
-  const header = req.headers.get("authorization") ?? "";
-  if (!/^Bearer\s+\S+/.test(header)) {
+  const role = bearerRole(req.headers.get("authorization") ?? "");
+  if (role === null) {
     return json({ error: "missing_token" }, 401);
+  }
+  if (role !== "service_role") {
+    return json({ error: "forbidden" }, 403);
   }
   let mode = "due";
   const text = await req.text();
@@ -106,6 +109,25 @@ export async function purgeDue(deps: PurgeDeps): Promise<PurgeResult> {
     }
   }
   return { deletedIds, remaining };
+}
+
+function bearerRole(header: string): string | null {
+  const match = /^Bearer\s+(\S+)/.exec(header.trim());
+  if (!match) return null;
+  const payload = match[1].split(".")[1];
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(decodeBase64Url(payload)) as { role?: unknown };
+    return typeof parsed.role === "string" ? parsed.role : null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeBase64Url(segment: string): string {
+  const padded = segment.replaceAll("-", "+").replaceAll("_", "/") +
+    "=".repeat((4 - (segment.length % 4)) % 4);
+  return atob(padded);
 }
 
 function json(body: unknown, status: number): Response {
